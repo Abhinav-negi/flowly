@@ -1,5 +1,3 @@
-// lib/services/firestoreUser.ts
-
 import { db } from "@/lib/firebase";
 import {
   doc,
@@ -33,6 +31,7 @@ export function docSnapToUserProfile(
   snap: DocumentSnapshot<DocumentData>
 ): UserProfile | null {
   if (!snap.exists()) return null;
+
   const data = snap.data()!;
 
   return {
@@ -59,6 +58,8 @@ export function docSnapToUserProfile(
     studyField: data.studyField,
     interests: Array.isArray(data.interests) ? data.interests : [],
     hobbies: Array.isArray(data.hobbies) ? data.hobbies : [],
+
+    // Fixed timestamps
     createdAt: data.createdAt?.toMillis?.() ?? Date.now(),
     updatedAt: data.updatedAt?.toMillis?.() ?? Date.now(),
 

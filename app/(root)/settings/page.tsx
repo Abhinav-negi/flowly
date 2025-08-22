@@ -1,5 +1,5 @@
 "use client";
-
+import { FirebaseError } from "firebase/app";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -75,31 +75,32 @@ export default function SettingsPage() {
     }
 
     setUpdatingPassword(true);
-    try {
-      const credential = EmailAuthProvider.credential(user.email!, currentPassword);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, newPassword);
+try {
+  const credential = EmailAuthProvider.credential(user.email!, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+  await updatePassword(user, newPassword);
 
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+  setCurrentPassword("");
+  setNewPassword("");
+  setConfirmPassword("");
 
-      showNotification("success", "Password updated successfully!");
-    } catch (err: any) {
-      switch (err.code) {
-        case "auth/wrong-password":
-          showNotification("error", "Current password is incorrect");
-          break;
-        case "auth/weak-password":
-          showNotification("error", "New password is too weak");
-          break;
-        default:
-          showNotification("error", err.message);
-      }
-    } finally {
-      setUpdatingPassword(false);
-    }
-  };
+  showNotification("success", "Password updated successfully!");
+} catch (err) {
+  const error = err as FirebaseError;
+
+  switch (error.code) {
+    case "auth/wrong-password":
+      showNotification("error", "Current password is incorrect");
+      break;
+    case "auth/weak-password":
+      showNotification("error", "New password is too weak");
+      break;
+    default:
+      showNotification("error", error.message);
+  }
+} finally {
+  setUpdatingPassword(false);
+}
 
   const handleUpdateMobile = async () => {
     if (!user) return;
@@ -233,4 +234,5 @@ export default function SettingsPage() {
       </div>
     </div>
   );
+}
 }

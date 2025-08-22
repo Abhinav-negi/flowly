@@ -65,7 +65,11 @@ export interface UserProfile {
   likesReceived: string[];
   dateCards?: DateCard[];
 
-  // Additional optional fields for profile and notifications
-  profileComplete?: boolean;     // computed or stored: essential fields completed
-  notifyBeforeMinutes?: number;  // notify before a date
+  // Additional optional fields
+  profileComplete?: boolean;
+  notifyBeforeMinutes?: number;
+
+  // Fixed: timestamps
+  createdAt?: number;
+  updatedAt?: number;
 }

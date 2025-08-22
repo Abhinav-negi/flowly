@@ -137,7 +137,7 @@ export default function MatchesPage() {
           </p>
           {/* Pink Clock Spinner */}
               <div style={{ display: "flex", justifyContent: "center", marginTop: "50px" }}>
-      <PinkCircularLoader size={100} strokeWidth={10} />
+      <PinkCircularLoader size={100}  />
     </div>
         </section>
       )}

@@ -14,9 +14,11 @@ import {
 export async function signUpWithEmail(email: string, password: string): Promise<UserCredential> {
   try {
     return await createUserWithEmailAndPassword(auth, email, password);
-  } catch (err: any) {
-    throw new Error(err.message);
-  }
+  } catch (err) {
+  const error = err as Error;
+  throw new Error(error.message);
+}
+
 }
 
 /** Login with email & password */
