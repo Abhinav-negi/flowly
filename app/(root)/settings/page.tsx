@@ -1,9 +1,15 @@
 "use client";
+
 import { FirebaseError } from "firebase/app";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { updatePassword, EmailAuthProvider, reauthenticateWithCredential, User } from "firebase/auth";
+import {
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  User,
+} from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import LogoutButton from "@/components/LogoutButton";
 
@@ -24,7 +30,10 @@ export default function SettingsPage() {
   const [updatingMobile, setUpdatingMobile] = useState(false);
 
   // Notification state
-  const [notification, setNotification] = useState<{ type: "error" | "success"; message: string } | null>(null);
+  const [notification, setNotification] = useState<{
+    type: "error" | "success";
+    message: string;
+  } | null>(null);
 
   // Load user info on mount
   useEffect(() => {
@@ -33,7 +42,7 @@ export default function SettingsPage() {
       setLoading(true);
 
       if (u) {
-        setIsPasswordUser(u.providerData.some(p => p.providerId === "password"));
+        setIsPasswordUser(u.providerData.some((p) => p.providerId === "password"));
 
         try {
           const docRef = doc(db, "users", u.uid);
@@ -75,32 +84,34 @@ export default function SettingsPage() {
     }
 
     setUpdatingPassword(true);
-try {
-  const credential = EmailAuthProvider.credential(user.email!, currentPassword);
-  await reauthenticateWithCredential(user, credential);
-  await updatePassword(user, newPassword);
 
-  setCurrentPassword("");
-  setNewPassword("");
-  setConfirmPassword("");
+    try {
+      const credential = EmailAuthProvider.credential(user.email!, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
 
-  showNotification("success", "Password updated successfully!");
-} catch (err) {
-  const error = err as FirebaseError;
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
 
-  switch (error.code) {
-    case "auth/wrong-password":
-      showNotification("error", "Current password is incorrect");
-      break;
-    case "auth/weak-password":
-      showNotification("error", "New password is too weak");
-      break;
-    default:
-      showNotification("error", error.message);
-  }
-} finally {
-  setUpdatingPassword(false);
-}
+      showNotification("success", "Password updated successfully!");
+    } catch (err) {
+      const error = err as FirebaseError;
+
+      switch (error.code) {
+        case "auth/wrong-password":
+          showNotification("error", "Current password is incorrect");
+          break;
+        case "auth/weak-password":
+          showNotification("error", "New password is too weak");
+          break;
+        default:
+          showNotification("error", error.message);
+      }
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
 
   const handleUpdateMobile = async () => {
     if (!user) return;
@@ -140,12 +151,21 @@ try {
 
       {/* Notification */}
       {notification && (
-        <div className={`p-4 rounded-lg border-l-4 ${
-          notification.type === "error" ? "border-red-500 bg-red-50 text-red-800" : "border-green-500 bg-green-50 text-green-800"
-        }`}>
+        <div
+          className={`p-4 rounded-lg border-l-4 ${
+            notification.type === "error"
+              ? "border-red-500 bg-red-50 text-red-800"
+              : "border-green-500 bg-green-50 text-green-800"
+          }`}
+        >
           <div className="flex justify-between items-center">
             <p className="text-sm font-medium">{notification.message}</p>
-            <button onClick={() => setNotification(null)} className="text-lg leading-none hover:opacity-75 ml-4">×</button>
+            <button
+              onClick={() => setNotification(null)}
+              className="text-lg leading-none hover:opacity-75 ml-4"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
@@ -219,10 +239,7 @@ try {
       <div className="rounded-lg border bg-white p-6 shadow-sm space-y-3">
         <h2 className="text-lg font-semibold text-gray-700">Support</h2>
         <p className="text-gray-600 text-sm">Need help? Contact our support team:</p>
-        <a
-          href="mailto:flowwithflowly@gmail.com"
-          className="text-[#E05265] hover:underline block"
-        >
+        <a href="mailto:flowwithflowly@gmail.com" className="text-[#E05265] hover:underline block">
           flowwithflowly@gmail.com
         </a>
       </div>
@@ -234,5 +251,4 @@ try {
       </div>
     </div>
   );
-}
 }

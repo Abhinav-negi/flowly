@@ -93,7 +93,7 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
       const password = (values as SignUpValues | SignInValues).password;
 
       if (mode === "signup") {
-        const { name, mobile, gender } = values as SignUpValues;
+        const { name,  } = values as SignUpValues;
         const userCredential = await signUpWithEmail(email, password);
         const uid = userCredential.user.uid;
 
