@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button";
 import { Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import  LogoutButton  from "@/components/dashboard/LogoutButton";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { Menu } from "lucide-react";
+// import { Menu } from "lucide-react";
 
 const navItems = [
   { name: "Dashboard", href: "/dashboard" },

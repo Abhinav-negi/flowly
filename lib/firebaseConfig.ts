@@ -16,7 +16,7 @@ const firebaseConfig = {
 function assertEnv(obj: Record<string, string | undefined>) {
   for (const [k, v] of Object.entries(obj)) {
     if (!v) {
-      //  eslint-disable-next-line no-console
+ 
       console.warn(`[firebase] Missing env: ${k}`);
     }
   }
