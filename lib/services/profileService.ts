@@ -1,9 +1,11 @@
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { updateDoc, serverTimestamp } from "firebase/firestore";
 import {  storage } from "@/lib/firebase";
-// import { sendNotification } from "@/lib/notificationService";
+ 
 import { getUserDocRef, fetchUserDocSnapshot, docSnapToUserProfile } from "./firestoreUser";
-import type { UserProfile } from "../types/userProfile";
+ 
+import type { UserProfile } from "@/lib/types/userProfile";
+
 
 /**
  * Fetch profile

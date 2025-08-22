@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import type { UserProfile } from "@/lib/services/profileService";
+import type { UserProfile } from "@/lib/types/userProfile";
+
 
 type Props = {
   profile: UserProfile | null;
