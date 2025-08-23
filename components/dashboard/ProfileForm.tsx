@@ -1,24 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, ChangeEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, User } from "firebase/auth";
+import { getProfile, updateProfile } from "@/lib/services/profileService";
 import {
-  getProfile,
-  updateProfile,
-} from "@/lib/services/profileService";
-
-import { UserProfile } from "@/lib/types/userProfile";
+  UserProfile,
+  Gender,
+  DietaryPreference,
+} from "@/lib/types/userProfile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 
 // --- Helper: calculate age from DOB
 function calculateAge(dob: string): number | undefined {
@@ -28,9 +21,7 @@ function calculateAge(dob: string): number | undefined {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const m = today.getMonth() - birthDate.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
   return age >= 0 ? age : undefined;
 }
 
@@ -41,72 +32,72 @@ export default function ProfileForm() {
   const [uid, setUid] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Fetch profile
+  // --- Fetch profile
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUid(user.uid);
-        const data = await getProfile(user.uid);
-
-        if (data) {
-          const age = data.dob ? calculateAge(data.dob) : undefined;
-          setProfile({ ...data, age });
-        } else {
-          // Create a complete UserProfile object with defaults
-          setProfile({
-            userId: user.uid,
-            name: user.displayName || "",
-            email: user.email || "",
-            interests: [],
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-            verification: {
-              photoVerified: false,
-              idVerified: false,
-              verificationStatus: "pending",
-            },
-            inQueue: false,
-            queueTimer: 0,
-            matchedUsers: [],
-            likesSent: [],
-            likesReceived: [],
-            dateCards: [],
-            mobileNumber: "",
-            instagramHandle: "",
-            age: undefined,
-            dob: "",
-            gender: undefined,
-            dietaryPreference: undefined,
-            workLifeStatus: undefined,
-            studyField: "",
-            hobbies: [],
-            bio: "",
-            profession: undefined,
-            institute: "",
-            course: "",
-            location: "",
-            datingPreference: undefined,
-          } as UserProfile);
-        }
-      } else {
+    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+      if (!user) {
         router.replace("/sign-in");
+        return;
+      }
+      setUid(user.uid);
+      const data = await getProfile(user.uid);
+      if (data) {
+        setProfile({
+          ...data,
+          age: data.dob ? calculateAge(data.dob) : undefined,
+          interests: data.interests || [],
+          hobbies: data.hobbies || [],
+          dateCards: data.dateCards || [],
+        });
+      } else {
+        setProfile({
+          userId: user.uid,
+          name: user.displayName || "",
+          email: user.email || "",
+          interests: [],
+          hobbies: [],
+          dateCards: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          verification: {
+            photoVerified: false,
+            idVerified: false,
+            verificationStatus: "pending",
+          },
+          inQueue: false,
+          queueTimer: 0,
+          matchedUsers: [],
+          likesSent: [],
+          likesReceived: [],
+          mobileNumber: "",
+          instagramHandle: "",
+          age: undefined,
+          dob: "",
+          gender: undefined,
+          dietaryPreference: undefined,
+          workLifeStatus: undefined,
+          studyField: "",
+          bio: "",
+          profession: undefined,
+          institute: "",
+          course: "",
+          location: "",
+          datingPreference: undefined,
+        } as UserProfile);
       }
       setLoading(false);
     });
-
     return () => unsubscribe();
   }, [router]);
 
+  // --- Save profile
   async function handleSave() {
     if (!uid || !profile) return;
     setLoading(true);
-
-    // Remove undefined fields before saving
     const profileToSave: Partial<UserProfile> = {};
     Object.entries(profile).forEach(([key, value]) => {
       if (value !== undefined) profileToSave[key as keyof UserProfile] = value;
     });
-
     try {
       await updateProfile(uid, profileToSave);
       setSaved(true);
@@ -114,26 +105,54 @@ export default function ProfileForm() {
     } catch (err) {
       console.error("Error updating profile:", err);
     }
-
     setLoading(false);
   }
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
   if (!profile) return null;
 
+  const handleInputChange =
+    (field: keyof UserProfile) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setProfile((prev) => ({ ...prev!, [field]: e.target.value }));
+    };
+
+  const handleArrayAdd =
+    (field: "interests" | "hobbies") =>
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && e.currentTarget.value.trim() !== "") {
+        e.preventDefault();
+        const val = e.currentTarget.value.trim();
+        setProfile((prev) => ({
+          ...prev!,
+          [field]: prev![field]!.includes(val)
+            ? prev![field]!
+            : [...prev![field]!, val],
+        }));
+        e.currentTarget.value = "";
+      }
+    };
+
+  const handleArrayRemove = (field: "interests" | "hobbies", index: number) => {
+    setProfile((prev) => ({
+      ...prev!,
+      [field]: prev![field]!.filter((_, i) => i !== index),
+    }));
+  };
+
   return (
     <div className="space-y-6">
-      {saved && (
-        <p className="text-green-600 font-semibold">Saved!</p>
-      )}
+      {saved && <p className="text-green-600 font-semibold">Saved!</p>}
 
       {/* Name */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Full Name</label>
+        <label className="block text-gray-700 font-medium mb-1">
+          Full Name
+        </label>
         <Input
-          className="bg-[#FAF7F5]"
           value={profile.name || ""}
-          onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+          onChange={handleInputChange("name")}
+          className="bg-[#FAF7F5]"
           placeholder="Your name"
         />
       </div>
@@ -141,31 +160,29 @@ export default function ProfileForm() {
       {/* Email */}
       <div>
         <label className="block text-gray-700 font-medium mb-1">Email</label>
-        <Input className="bg-[#FAF7F5]" value={profile.email || ""} disabled />
+        <Input value={profile.email || ""} className="bg-[#FAF7F5]" disabled />
       </div>
 
       {/* Mobile */}
       <div>
         <label className="block text-gray-700 font-medium mb-1">Mobile</label>
         <Input
-          className="bg-[#FAF7F5]"
           value={profile.mobileNumber || ""}
-          onChange={(e) =>
-            setProfile({ ...profile, mobileNumber: e.target.value })
-          }
+          onChange={handleInputChange("mobileNumber")}
+          className="bg-[#FAF7F5]"
           placeholder="Phone number"
         />
       </div>
 
-      {/* Instagram Handle */}
+      {/* Instagram */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Instagram Handle</label>
+        <label className="block text-gray-700 font-medium mb-1">
+          Instagram Handle
+        </label>
         <Input
-          className="bg-[#FAF7F5]"
           value={profile.instagramHandle || ""}
-          onChange={(e) =>
-            setProfile({ ...profile, instagramHandle: e.target.value })
-          }
+          onChange={handleInputChange("instagramHandle")}
+          className="bg-[#FAF7F5]"
           placeholder="@yourhandle"
         />
       </div>
@@ -174,11 +191,9 @@ export default function ProfileForm() {
       <div>
         <label className="block text-gray-700 font-medium mb-1">Location</label>
         <Input
-          className="bg-[#FAF7F5]"
           value={profile.location || ""}
-          onChange={(e) =>
-            setProfile({ ...profile, location: e.target.value })
-          }
+          onChange={handleInputChange("location")}
+          className="bg-[#FAF7F5]"
           placeholder="City, Country"
         />
       </div>
@@ -187,15 +202,16 @@ export default function ProfileForm() {
       <div>
         <label className="block text-gray-700 font-medium mb-1">Gender</label>
         <select
-          className="w-full p-2 rounded bg-[#FAF7F5] border"
-          value={profile.gender || "male"}
+          className="w-full p-2 rounded bg-white border"
+          value={profile.gender || ""}
           onChange={(e) =>
-            setProfile({
-              ...profile,
-              gender: e.target.value as "male" | "female" | "other",
-            })
+            setProfile((prev) => ({
+              ...prev!,
+              gender: e.target.value as Gender,
+            }))
           }
         >
+          <option value="">Select...</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
           <option value="other">Other</option>
@@ -204,16 +220,18 @@ export default function ProfileForm() {
 
       {/* DOB */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Date of Birth</label>
+        <label className="block text-gray-700 font-medium mb-1">
+          Date of Birth
+        </label>
         <Input
           type="date"
-          className="bg-[#FAF7F5]"
           value={profile.dob || ""}
           onChange={(e) => {
-            const newDob = e.target.value;
-            const newAge = calculateAge(newDob);
-            setProfile({ ...profile, dob: newDob, age: newAge });
+            const dob = e.target.value;
+            const age = calculateAge(dob);
+            setProfile((prev) => ({ ...prev!, dob, age }));
           }}
+          className="bg-[#FAF7F5]"
         />
       </div>
 
@@ -221,9 +239,9 @@ export default function ProfileForm() {
       <div>
         <label className="block text-gray-700 font-medium mb-1">Age</label>
         <Input
-          className="bg-[#FAF7F5] text-gray-500"
-          value={profile.age !== undefined ? profile.age.toString() : ""}
+          value={profile.age?.toString() || ""}
           disabled
+          className="bg-[#FAF7F5] text-gray-500"
         />
       </div>
 
@@ -231,33 +249,30 @@ export default function ProfileForm() {
       <div>
         <label className="block text-gray-700 font-medium mb-1">Bio</label>
         <textarea
-          className="w-full p-2 rounded bg-[#FAF7F5] border"
           rows={3}
           value={profile.bio || ""}
-          onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+          onChange={handleInputChange("bio")}
           placeholder="Write something about yourself..."
+          className="w-full p-2 rounded bg-[#FAF7F5] border"
         />
       </div>
 
       {/* Interests */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Interests</label>
+        <label className="block text-gray-700 font-medium mb-1">
+          Interests
+        </label>
         <div className="flex flex-wrap gap-2 mb-2">
-          {(profile.interests || []).map((interest, idx) => (
+          {profile.interests!.map((i, idx) => (
             <div
               key={idx}
               className="flex items-center bg-[#FAF7F5] px-3 py-1 rounded-full border text-sm"
             >
-              {interest}
+              {i}
               <button
                 type="button"
                 className="ml-2 text-gray-500 hover:text-red-500 font-bold"
-                onClick={() =>
-                  setProfile({
-                    ...profile,
-                    interests: (profile.interests || []).filter((_, i) => i !== idx),
-                  })
-                }
+                onClick={() => handleArrayRemove("interests", idx)}
               >
                 ×
               </button>
@@ -265,32 +280,25 @@ export default function ProfileForm() {
           ))}
         </div>
         <Input
-          className="bg-[#FAF7F5]"
           placeholder="Type an interest and press Enter"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && e.currentTarget.value.trim() !== "") {
-              e.preventDefault();
-              const newInterest = e.currentTarget.value.trim();
-              if (!(profile.interests || []).includes(newInterest)) {
-                setProfile({
-                  ...profile,
-                  interests: [...(profile.interests || []), newInterest],
-                });
-              }
-              e.currentTarget.value = "";
-            }
-          }}
+          className="bg-[#FAF7F5]"
+          onKeyDown={handleArrayAdd("interests")}
         />
       </div>
 
       {/* Profession */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Profession</label>
+        <label className="block text-gray-700 font-medium mb-1">
+          Profession
+        </label>
         <select
-          className="w-full p-2 rounded bg-[#FAF7F5] border"
+          className="w-full p-2 rounded bg-white border"
           value={profile.profession || ""}
           onChange={(e) =>
-            setProfile({ ...profile, profession: e.target.value as "student" | "job" })
+            setProfile((prev) => ({
+              ...prev!,
+              profession: e.target.value as "student" | "job",
+            }))
           }
         >
           <option value="">Select...</option>
@@ -303,20 +311,24 @@ export default function ProfileForm() {
       {profile.profession === "student" && (
         <div className="space-y-4">
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Institute</label>
+            <label className="block text-gray-700 font-medium mb-1">
+              Institute
+            </label>
             <Input
-              className="bg-[#FAF7F5]"
               value={profile.institute || ""}
-              onChange={(e) => setProfile({ ...profile, institute: e.target.value })}
+              onChange={handleInputChange("institute")}
+              className="bg-[#FAF7F5]"
               placeholder="Your institute"
             />
           </div>
           <div>
-            <label className="block text-gray-700 font-medium mb-1">Course</label>
+            <label className="block text-gray-700 font-medium mb-1">
+              Course
+            </label>
             <Input
-              className="bg-[#FAF7F5]"
               value={profile.course || ""}
-              onChange={(e) => setProfile({ ...profile, course: e.target.value })}
+              onChange={handleInputChange("course")}
+              className="bg-[#FAF7F5]"
               placeholder="Your course/program"
             />
           </div>
@@ -325,43 +337,49 @@ export default function ProfileForm() {
 
       {/* Dating Preference */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Dating Preference</label>
-        <Select
-          value={profile?.datingPreference || ""}
-          onValueChange={(value) =>
-            setProfile({ ...profile!, datingPreference: value as "split" | "full" })
+        <label className="block text-gray-700 font-medium mb-1">
+          Dating Preference
+        </label>
+        <select
+          className="w-full p-2 rounded bg-white border"
+          value={profile.datingPreference || ""}
+          onChange={(e) =>
+            setProfile((prev) => ({
+              ...prev!,
+              datingPreference: e.target.value as "split" | "full",
+            }))
           }
         >
-          <SelectTrigger className="w-full bg-[#FAF7F5] border border-gray-300 rounded-lg px-4 py-3 text-gray-700 font-medium focus:ring-2 focus:ring-[#E05265]/50 focus:border-[#E05265] transition">
-            <SelectValue placeholder="Choose your preference" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="split">Split the bill</SelectItem>
-            <SelectItem value="full">Pay the full bill</SelectItem>
-          </SelectContent>
-        </Select>
+          <option value="">Select...</option>
+          <option value="split">Split the bill</option>
+          <option value="full">Pay the full bill</option>
+        </select>
       </div>
 
       {/* Dietary Preference */}
       <div>
-        <label className="block text-gray-700 font-medium mb-1">Dietary Preference</label>
-        <Select
-          value={profile?.dietaryPreference || ""}
-          onValueChange={(value) =>
-            setProfile({ ...profile!, dietaryPreference: value as "veg" | "non-veg" | "vegan" | "other" })
+        <label className="block text-gray-700 font-medium mb-1">
+          Dietary Preference
+        </label>
+        <select
+          className="w-full p-2 rounded bg-white border"
+          value={profile.dietaryPreference || ""}
+          onChange={(e) =>
+            setProfile((prev) => ({
+              ...prev!,
+              dietaryPreference: e.target.value as DietaryPreference,
+            }))
           }
         >
-          <SelectTrigger className="w-full bg-[#FAF7F5] border border-gray-300 rounded-lg px-4 py-3 text-gray-700 font-medium focus:ring-2 focus:ring-[#E05265]/50 focus:border-[#E05265] transition">
-            <SelectValue placeholder="Choose your dietary preference" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="veg">Veg</SelectItem>
-            <SelectItem value="non-veg">Non-Veg</SelectItem>
-            <SelectItem value="vegan">Vegan</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
-          </SelectContent>
-        </Select>
+          <option value="">Select...</option>
+          <option value="veg">Veg</option>
+          <option value="non-veg">Non-Veg</option>
+          <option value="vegan">Vegan</option>
+          <option value="other">Other</option>
+        </select>
       </div>
+
+ 
 
       {/* Save Button */}
       <Button

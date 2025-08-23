@@ -4,10 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import {
-  getUserProfile,
-  setUserInQueue,
-} from "@/lib/services/userService";
+import { getUserProfile, setUserInQueue } from "@/lib/services/userService";
 import { UserProfile } from "@/lib/types/userProfile";
 import PinkCircularLoader from "@/components/PinkCircularLoader";
 
@@ -16,6 +13,9 @@ export default function MatchesPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showProfileSummary, setShowProfileSummary] = useState(false);
+
+  // ✅ new state for unverified pop-up
+  const [showVerificationPopup, setShowVerificationPopup] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -52,12 +52,13 @@ export default function MatchesPage() {
   const handleJoinQueue = async () => {
     if (!user) return;
 
+    // ✅ show pop-up instead of alert
     if (
       !user.verification.idVerified ||
       !user.verification.photoVerified ||
       user.verification.verificationStatus !== "verified"
     ) {
-      alert("You must complete verification before joining the queue.");
+      setShowVerificationPopup(true);
       return;
     }
 
@@ -81,9 +82,31 @@ export default function MatchesPage() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-b from-[#FAF7F5] to-[#ECCFC6] flex flex-col items-center">
-      <h1 className="text-3xl font-bold text-center mb-6">
+      <h1 className="text-3xl font-bold text-center font-secondary mb-6">
         Your Upcoming Dates
       </h1>
+
+      {/* ===== Verification Required Pop-up ===== */}
+      {showVerificationPopup && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md text-[#E05265] space-y-4">
+            <h2 className="text-xl font-semibold font-secondary text-center">
+              Complete Your Verification
+            </h2>
+            <p className="text-center ">
+              You must complete your ID and photo verification before joining the queue.
+            </p>
+            <div className="flex justify-center mt-4">
+              <button
+                className="px-4 py-2 bg-[#E05265] text-white font-semibold rounded hover:bg-pink-600"
+                onClick={() => setShowVerificationPopup(false)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== Pre-Queue Profile Summary Popup ===== */}
       {showProfileSummary && (
@@ -130,22 +153,21 @@ export default function MatchesPage() {
       {user.inQueue && (
         <section className="bg-white shadow rounded-xl p-6 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
           <h2 className="text-xl font-semibold text-[#E05265]">
-            We’re finding your perfect match
+            We&apos;re finding your perfect match
           </h2>
           <p className="text-gray-600 text-center">
             Please wait while we match you based on your interests.
           </p>
-          {/* Pink Clock Spinner */}
-              <div style={{ display: "flex", justifyContent: "center", marginTop: "50px" }}>
-      <PinkCircularLoader size={100}  />
-    </div>
+          <div style={{ display: "flex", justifyContent: "center", marginTop: "50px" }}>
+            <PinkCircularLoader size={100}  />
+          </div>
         </section>
       )}
 
       {/* ===== Join Queue Button ===== */}
       {!user.inQueue && (
         <section className="bg-white shadow rounded-xl p-6 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
-          <h2 className="text-xl font-semibold text-[#E05265]">
+          <h2 className="text-xl font-semibold font-secondary text-[#E05265]">
             Find Your Perfect Match
           </h2>
           <p className="text-gray-600 text-center">

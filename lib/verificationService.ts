@@ -1,8 +1,22 @@
 import { db, storage, auth } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, uploadString, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 
 export type VerificationStatus = "pending" | "in_review" | "verified" | "rejected";
+
+/**
+ * Delete a file from Firebase Storage given its URL
+ */
+export async function deleteFile(fileUrl: string): Promise<void> {
+  if (!fileUrl) return;
+  try {
+    const storageRef = ref(storage, fileUrl.split("/o/")[1].split("?")[0]); // Decode path from URL
+    await deleteObject(storageRef);
+    console.log(`Deleted previous file: ${fileUrl}`);
+  } catch (err) {
+    console.warn(`Failed to delete file: ${fileUrl}`, err);
+  }
+}
 
 /**
  * Upload ID card
@@ -32,7 +46,6 @@ export async function uploadSelfie(imageDataUrl: string): Promise<string> {
   const user = auth.currentUser;
   if (!user) throw new Error("No authenticated user");
 
-  // Ensure proper data_url format
   const validDataUrl = imageDataUrl.startsWith("data:") ? imageDataUrl : `data:image/jpeg;base64,${imageDataUrl}`;
 
   const storageRef = ref(storage, `verifications/${user.uid}/selfie_${Date.now()}.jpg`);

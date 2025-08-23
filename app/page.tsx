@@ -24,12 +24,12 @@ export default function Home() {
           width={500}
           height={500}
           priority
-          className="w-[250px] sm:w-[400px] md:w-[500px] lg:w-[600px] h-auto"
+          className=" mt-10  w-[500px] sm:mt-0 md:w-[500px] lg:w-[600px] h-auto"
         />
 
         <h1
           id="perks"
-          className="text-[#E05265] text-center leading-snug font-secondary mb-5 text-2xl sm:text-3xl md:text-4xl"
+          className="text-[#E05265]  text-center leading-snug font-secondary mb-5 text-2xl sm:text-3xl md:text-4xl"
         >
           Find Love Beyond First Sight
         </h1>

@@ -173,7 +173,7 @@ export default function SettingsPage() {
       {/* Mobile Number Section */}
       <div className="rounded-lg border bg-white p-6 shadow-sm space-y-4">
         <h2 className="text-lg font-semibold text-gray-700">Mobile Number</h2>
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-wrap justify-center gap-2 items-center">
           <input
             type="text"
             value={mobile}
@@ -185,7 +185,7 @@ export default function SettingsPage() {
           <Button
             onClick={handleUpdateMobile}
             disabled={updatingMobile}
-            className="bg-[#E05265] hover:bg-[#C04255] text-white rounded-md"
+            className="bg-[#E05265] hover:bg-[#C04255] w-full text-white rounded-md"
           >
             {updatingMobile ? "Updating..." : "Save"}
           </Button>
