@@ -10,7 +10,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import LogoutButton from "@/components/dashboard/LogoutButton";
+
+import LogoutButton from "@/components/LogoutButton";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
 
