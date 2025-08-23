@@ -137,6 +137,8 @@ export default function VerificationPage() {
     return { text: "Unknown status", style: "bg-gray-100 text-gray-800" };
   };
 
+  const isVerified = profile?.verification?.verificationStatus === "verified";
+
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-b from-[#FAF7F5] to-[#ECCFC6]">
       <main className="flex-1 w-11/12 max-w-5xl mx-auto py-10 space-y-10">
@@ -153,7 +155,7 @@ export default function VerificationPage() {
             </div>
             <p className="text-sm text-gray-600 mb-4">Upload a valid government ID</p>
 
-            {!profile?.verification?.idDocUrl && !loadingId && (
+            {!profile?.verification?.idDocUrl && !loadingId && !isVerified && (
               <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-[#E05265] bg-[#FFF5F7] hover:bg-[#FFE4EA] text-[#E05265] text-sm font-medium transition">
                 <input type="file" accept="image/*" onChange={handleIdUpload} className="hidden" />
                 📂 Choose File
@@ -163,17 +165,24 @@ export default function VerificationPage() {
             <div className="mt-2 flex flex-col items-start">
               {loadingId && <div className="w-32 h-20 rounded-md bg-gray-200 animate-pulse" />}
               {profile?.verification?.idDocUrl && !loadingId && (
-                <Image
-                  src={profile.verification.idDocUrl}
-                  alt="ID Preview"
-                  width={128}
-                  height={80}
-                  className="rounded-md object-cover"
-                  onLoadingComplete={() => setLoadingId(false)}
-                />
-              )}
-              {profile?.verification?.idDocUrl && !loadingId && (
-                <p className="text-green-600 mt-1">ID uploaded successfully</p>
+                <>
+                  <Image
+                    src={profile.verification.idDocUrl}
+                    alt="ID Preview"
+                    width={128}
+                    height={80}
+                    className="rounded-md object-cover"
+                    onLoadingComplete={() => setLoadingId(false)}
+                  />
+                  <p className="text-green-600 mt-1">ID uploaded successfully</p>
+                  {/* Re-upload Button (only if not verified) */}
+                  {!isVerified && (
+                    <label className="mt-3 cursor-pointer flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-[#E05265] bg-[#FFF5F7] hover:bg-[#FFE4EA] text-[#E05265] text-sm font-medium transition">
+                      <input type="file" accept="image/*" onChange={handleIdUpload} className="hidden" />
+                       Re-upload ID
+                    </label>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -186,7 +195,7 @@ export default function VerificationPage() {
             </div>
             <p className="text-sm text-gray-600 mb-4">Take a live selfie for verification</p>
 
-            {!profile?.verification?.livePhotoUrl && !loadingSelfie && (
+            {!profile?.verification?.livePhotoUrl && !loadingSelfie && !isVerified && (
               <Button
                 className="bg-[#E05265] text-white rounded-xl"
                 onClick={() => setSelfieOpen(true)}
@@ -198,19 +207,28 @@ export default function VerificationPage() {
             <div className="mt-2 flex flex-col items-start">
               {loadingSelfie && <div className="w-32 h-32 rounded-full bg-gray-200 animate-pulse" />}
               {profile?.verification?.livePhotoUrl && !loadingSelfie && (
-                <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-[#E05265]">
-                  <Image
-                    src={profile.verification.livePhotoUrl}
-                    alt="Selfie Preview"
-                    width={128}
-                    height={128}
-                    className="object-cover"
-                    onLoadingComplete={() => setLoadingSelfie(false)}
-                  />
-                </div>
-              )}
-              {profile?.verification?.livePhotoUrl && !loadingSelfie && (
-                <p className="text-green-600 mt-1">Selfie uploaded successfully</p>
+                <>
+                  <div className="w-32 h-32 rounded-full overflow-hidden border-2 border-[#E05265]">
+                    <Image
+                      src={profile.verification.livePhotoUrl}
+                      alt="Selfie Preview"
+                      width={128}
+                      height={128}
+                      className="object-cover"
+                      onLoadingComplete={() => setLoadingSelfie(false)}
+                    />
+                  </div>
+                  <p className="text-green-600 mt-1">Selfie uploaded successfully</p>
+                  {/* Re-upload Selfie Button (only if not verified) */}
+                  {!isVerified && (
+                    <Button
+                      className="mt-3 bg-[#E05265] text-white rounded-xl"
+                      onClick={() => setSelfieOpen(true)}
+                    >
+                       Re-upload Selfie
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -257,34 +257,43 @@ export default function ProfileForm() {
         />
       </div>
 
-      {/* Interests */}
-      <div>
-        <label className="block text-gray-700 font-medium mb-1">
-          Interests
-        </label>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {profile.interests!.map((i, idx) => (
-            <div
-              key={idx}
-              className="flex items-center bg-[#FAF7F5] px-3 py-1 rounded-full border text-sm"
-            >
-              {i}
-              <button
-                type="button"
-                className="ml-2 text-gray-500 hover:text-red-500 font-bold"
-                onClick={() => handleArrayRemove("interests", idx)}
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-        <Input
-          placeholder="Type an interest and press Enter"
-          className="bg-[#FAF7F5]"
-          onKeyDown={handleArrayAdd("interests")}
-        />
+{/* Interests */}
+<div>
+  <label className="block text-gray-700 font-medium mb-1">
+    Interests
+  </label>
+  <div className="flex flex-wrap gap-2 mb-2">
+    {profile.interests!.map((i, idx) => (
+      <div
+        key={idx}
+        className="flex items-center bg-[#FAF7F5] px-3 py-1 rounded-full border text-sm"
+      >
+        {i}
+        <button
+          type="button"
+          className="ml-2 text-gray-500 hover:text-red-500 font-bold"
+          onClick={() => handleArrayRemove("interests", idx)}
+        >
+          ×
+        </button>
       </div>
+    ))}
+  </div>
+
+  <Input
+    type="text"
+    placeholder="Type an interest and press Enter"
+    className="bg-[#FAF7F5]"
+    enterKeyHint="done"   // 👈 makes mobile keyboard show "Done"
+    onKeyDown={(e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();              // 👈 stops moving to next field
+        handleArrayAdd("interests")(e);  // 👈 call your add function
+      }
+    }}
+  />
+</div>
+
 
       {/* Profession */}
       <div>
