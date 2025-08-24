@@ -1,11 +1,16 @@
 "use client";
 
+import { CheckCircle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { getUserProfile, setUserInQueue } from "@/lib/services/userService";
-import { UserProfile } from "@/lib/types/userProfile";
+import {
+  getUserProfile,
+  setUserInQueue,
+  respondToDate,
+} from "@/lib/services/userService";
+import { UserProfile, DateCard } from "@/lib/types/userProfile";
 import PinkCircularLoader from "@/components/PinkCircularLoader";
 
 export default function MatchesPage() {
@@ -14,8 +19,37 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true);
   const [showProfileSummary, setShowProfileSummary] = useState(false);
 
-  // ✅ new state for unverified pop-up
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+
+  // Decline reason state
+  const [declineReason, setDeclineReason] = useState("");
+  const [showDeclineModal, setShowDeclineModal] = useState(false);
+  const [activeCard, setActiveCard] = useState<DateCard | null>(null);
+
+  const openDeclineModal = (card: DateCard) => {
+    setActiveCard(card);
+    setDeclineReason("");
+    setShowDeclineModal(true);
+  };
+
+  const submitDecline = async () => {
+    if (!user || !activeCard) return;
+    if (!declineReason.trim()) {
+      alert("Please provide a reason for declining.");
+      return;
+    }
+    await respondToDate(
+      user.userId,
+      activeCard.matchUid,
+      "decline",
+      declineReason.trim()
+    );
+    const updated = await getUserProfile(user.userId);
+    if (updated) setUser(updated);
+    setShowDeclineModal(false);
+    setActiveCard(null);
+    setDeclineReason("");
+  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -52,7 +86,6 @@ export default function MatchesPage() {
   const handleJoinQueue = async () => {
     if (!user) return;
 
-    // ✅ show pop-up instead of alert
     if (
       !user.verification.idVerified ||
       !user.verification.photoVerified ||
@@ -67,12 +100,19 @@ export default function MatchesPage() {
 
   const confirmJoinQueue = async () => {
     if (!user) return;
-    await setUserInQueue(user.userId, true); // no timer now
+    await setUserInQueue(user.userId, true);
     const updatedProfile = await getUserProfile(user.userId);
     if (updatedProfile) {
       setUser(updatedProfile);
       setShowProfileSummary(false);
     }
+  };
+
+  const handleAccept = async (card: DateCard) => {
+    if (!user) return;
+    await respondToDate(user.userId, card.matchUid, "accept");
+    const updatedProfile = await getUserProfile(user.userId);
+    if (updatedProfile) setUser(updatedProfile);
   };
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
@@ -86,7 +126,7 @@ export default function MatchesPage() {
         Your Upcoming Dates
       </h1>
 
-      {/* ===== Verification Required Pop-up ===== */}
+      {/* Verification Required Pop-up */}
       {showVerificationPopup && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md text-[#E05265] space-y-4">
@@ -94,7 +134,8 @@ export default function MatchesPage() {
               Complete Your Verification
             </h2>
             <p className="text-center ">
-              You must complete your ID and photo verification before joining the queue.
+              You must complete your ID and photo verification before joining
+              the queue.
             </p>
             <div className="flex justify-center mt-4">
               <button
@@ -108,7 +149,7 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {/* ===== Pre-Queue Profile Summary Popup ===== */}
+      {/* Pre-Queue Profile Summary Popup */}
       {showProfileSummary && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-white p-6 rounded-2xl shadow-lg w-full max-w-md space-y-4">
@@ -116,13 +157,29 @@ export default function MatchesPage() {
               Confirm Your Profile
             </h2>
             <div className="space-y-2">
-              <p><strong>Name:</strong> {user.name || "Not provided"}</p>
-              <p><strong>Age:</strong> {user.age || "Not provided"}</p>
-              <p><strong>Gender:</strong> {user.gender || "Not provided"}</p>
-              <p><strong>Location:</strong> {user.location || "Not provided"}</p>
-              <p><strong>Interests:</strong> {user.interests?.join(", ") || "Not provided"}</p>
-              <p><strong>Hobbies:</strong> {user.hobbies?.join(", ") || "Not provided"}</p>
-              <p><strong>Bio:</strong> {user.bio || "Not provided"}</p>
+              <p>
+                <strong>Name:</strong> {user.name || "Not provided"}
+              </p>
+              <p>
+                <strong>Age:</strong> {user.age || "Not provided"}
+              </p>
+              <p>
+                <strong>Gender:</strong> {user.gender || "Not provided"}
+              </p>
+              <p>
+                <strong>Location:</strong> {user.location || "Not provided"}
+              </p>
+              <p>
+                <strong>Interests:</strong>{" "}
+                {user.interests?.join(", ") || "Not provided"}
+              </p>
+              <p>
+                <strong>Hobbies:</strong>{" "}
+                {user.hobbies?.join(", ") || "Not provided"}
+              </p>
+              <p>
+                <strong>Bio:</strong> {user.bio || "Not provided"}
+              </p>
             </div>
 
             {incompleteFields.length > 0 && (
@@ -149,8 +206,8 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {/* ===== Queue Card Section ===== */}
-      {user.inQueue && (
+      {/* Queue Loader (only if no cards) */}
+      {user.inQueue && (!user.dateCards || user.dateCards.length === 0) && (
         <section className="bg-white shadow rounded-xl p-6 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
           <h2 className="text-xl font-semibold text-[#E05265]">
             We&apos;re finding your perfect match
@@ -158,13 +215,19 @@ export default function MatchesPage() {
           <p className="text-gray-600 text-center">
             Please wait while we match you based on your interests.
           </p>
-          <div style={{ display: "flex", justifyContent: "center", marginTop: "50px" }}>
-            <PinkCircularLoader size={100}  />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginTop: "50px",
+            }}
+          >
+            <PinkCircularLoader size={100} />
           </div>
         </section>
       )}
 
-      {/* ===== Join Queue Button ===== */}
+      {/* Join Queue Button */}
       {!user.inQueue && (
         <section className="bg-white shadow rounded-xl p-6 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
           <h2 className="text-xl font-semibold font-secondary text-[#E05265]">
@@ -184,30 +247,151 @@ export default function MatchesPage() {
 
       {/* ===== Existing Date Cards ===== */}
       {user.dateCards && user.dateCards.length > 0 ? (
-        user.dateCards.map((card, idx) => (
-          <div
-            key={idx}
-            className="bg-white shadow rounded-xl p-6 mb-4 flex flex-col space-y-2 w-full max-w-md"
-          >
-            <h2 className="text-xl font-semibold">Match: {card.matchUid}</h2>
-            <p><strong>Time:</strong> {card.time}</p>
-            <p><strong>Location:</strong> {card.location}</p>
+        user.dateCards.map((card, idx) => {
+          const youDeclined = card.declined && card.declinedBy === user.userId;
 
-            {card.confirmed ? (
-              <p className="text-green-600 font-semibold">
-                Both agreed! Date is confirmed.
-              </p>
-            ) : card.userAccepted ? (
-              <p className="text-blue-600 font-medium">
-                Waiting for the other user to accept...
-              </p>
-            ) : (
-              <p className="text-gray-500">Date pending confirmation...</p>
-            )}
-          </div>
-        ))
+          return (
+            <div
+              key={idx}
+              className="bg-white shadow-lg rounded-2xl p-6 mb-4 flex flex-col space-y-3 w-full max-w-md border border-pink-200"
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-[#E05265]">
+                  Match Found 🎉
+                </h2>
+                {card.confirmed && (
+                  <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded">
+                    CONFIRMED
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-1 text-sm">
+                <p>
+                  <strong>Match ID:</strong> {card.matchUid}
+                </p>
+                <p>
+                  <strong>Date:</strong> {card.time}
+                </p>
+                <p>
+                  <strong>Location:</strong> {card.location}
+                </p>
+                <p>
+                  <strong>Description:</strong> {card.description}
+                </p>
+                {card.specialInstructions && (
+                  <p>
+                    <strong>Instructions:</strong> {card.specialInstructions}
+                  </p>
+                )}
+              </div>
+
+              {/* Status */}
+              {card.declined ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-700 text-sm">
+                  {youDeclined ? (
+                    <>
+                      <p className="font-semibold">You declined this date.</p>
+                      {card.declineReason && (
+                        <p>Reason: {card.declineReason}</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold">
+                        The other person declined this date.
+                      </p>
+                      {card.declineReason && (
+                        <p>Reason: {card.declineReason}</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : card.confirmed ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-700 text-sm">
+                  ✅ Date Confirmed! Meet at <strong>{card.location}</strong>
+                </div>
+              ) : card.userAccepted ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-700 text-sm">
+                  Waiting for the other user to accept...
+                </div>
+              ) : card.otherAccepted ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-700 text-sm">
+                  The other user accepted. Please respond.
+                </div>
+              ) : (
+                <div className="text-gray-500 text-sm">
+                  Please respond to this date.
+                </div>
+              )}
+
+              {/* Actions (hidden if declined or confirmed or already accepted) */}
+              {!card.declined && !card.confirmed && !card.userAccepted && (
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <button
+                    onClick={() => handleAccept(card)}
+                    className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#FF8FA3] to-[#E05265] text-white font-semibold px-5 py-2 shadow-md hover:shadow-lg active:scale-[.98] transition"
+                  >
+                    <CheckCircle className="mr-2 h-5 w-5" />
+                    Accept
+                  </button>
+
+                  <button
+                    onClick={() => openDeclineModal(card)}
+                    className="inline-flex items-center justify-center rounded-xl border-2 border-[#E05265]/40 text-[#E05265] font-semibold px-5 py-2 hover:bg-[#E05265]/5 active:scale-[.98] transition"
+                  >
+                    <XCircle className="mr-2 h-5 w-5" />
+                    Reject
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })
       ) : (
         <p className="text-center text-gray-500">No upcoming dates yet.</p>
+      )}
+
+      {/* Decline Reason Modal */}
+      {showDeclineModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-lg font-semibold text-[#E05265] text-center">
+              Why are you rejecting this date?
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 text-center">
+              Please share a short reason. This helps us improve your future
+              matches.
+            </p>
+
+            <textarea
+              className="mt-4 w-full rounded-lg border p-3 text-sm outline-none focus:ring-2 focus:ring-[#E05265]/40"
+              rows={4}
+              placeholder="e.g., timing doesn’t work, not my vibe, location too far…"
+              value={declineReason}
+              onChange={(e) => setDeclineReason(e.target.value)}
+            />
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  setShowDeclineModal(false);
+                  setActiveCard(null);
+                  setDeclineReason("");
+                }}
+                className="rounded-xl border border-gray-300 bg-white px-5 py-2 font-semibold hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitDecline}
+                className="rounded-xl bg-red-500 px-5 py-2 font-semibold text-white hover:bg-red-600"
+              >
+                Submit Decline
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

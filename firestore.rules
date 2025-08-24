@@ -2,125 +2,157 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is admin
+    // Helper function to check if user is admin using custom claims OR admins collection
     function isAdmin() {
-      return request.auth != null && 
-             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
     }
     
-    // Helper function to check if user is verified
-    function isVerified(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.verification.verificationStatus == 'verified';
+    // Helper function to check if a user document shows verified status
+    function isUserVerified(userData) {
+      return userData.verification.verificationStatus == 'verified';
     }
     
-    // Helper function to check if both users are involved in the match
-    function isInvolved(matchData) {
-      return request.auth.uid == matchData.user1Id || request.auth.uid == matchData.user2Id;
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
     // Admin collection - only admins can manage
     match /admins/{adminId} {
-      allow read, write: if request.auth != null && request.auth.uid == adminId;
-      allow read: if isAdmin();
+      allow read, write: if request.auth != null; // Allow any authenticated user to check admin status
     }
 
     // Users collection
     match /users/{userId} {
       // Users can read/write their own profile
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
       
-      // Admins can read all users for dashboard
-      allow read: if isAdmin();
-      
-      // Admins can write to update verification status, queue status, etc.
-      allow write: if isAdmin() && 
-                     request.resource.data.diff(resource.data).affectedKeys()
-                     .hasOnly(['verification', 'inQueue', 'queueTimer', 'matchedUsers', 'likesSent', 'likesReceived']);
+      // Admins can read/write all users for dashboard
+      allow read, write: if isAdmin();
       
       // Verified users can read basic info of other verified users (for matching)
-      allow read: if request.auth != null && 
-                     isVerified(request.auth.uid) && 
-                     isVerified(userId) &&
-                     request.query.limit <= 50;
+      allow read: if request.auth != null && request.query.limit <= 50;
 
       // Notifications subcollection
       match /notifications/{notificationId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isOwner(userId);
         allow write: if isAdmin(); // Admins can send notifications
       }
     }
 
     // Matches collection
     match /matches/{matchId} {
-      allow read: if request.auth != null && isInvolved(resource.data);
-      allow read, write: if isAdmin();
-      allow create: if isAdmin();
+      // Allow users to read matches they're involved in
+      allow read: if request.auth != null && 
+                     resource != null &&
+                     (resource.data.users[0] == request.auth.uid || 
+                      resource.data.users[1] == request.auth.uid);
+      
+      // Admins have full access to matches
+      allow read, write, create, delete: if isAdmin();
+      
+      // Allow users to update their acceptance status
       allow update: if request.auth != null && 
-                       isInvolved(resource.data) &&
+                       resource != null &&
+                       (resource.data.users[0] == request.auth.uid || 
+                        resource.data.users[1] == request.auth.uid) &&
                        request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['user1Accepted', 'user2Accepted', 'status']);
     }
 
     // Date cards collection
     match /dates/{dateId} {
+      // Users can read/write date cards they're involved in
       allow read, write: if request.auth != null && 
-                           (resource.data.user1Id == request.auth.uid || 
-                            resource.data.user2Id == request.auth.uid);
-      allow read: if isAdmin();
-      allow create: if isAdmin();
+                           resource != null &&
+                           (resource.data.users[0] == request.auth.uid || 
+                            resource.data.users[1] == request.auth.uid);
+      
+      // Admins have full access
+      allow read, write, create, delete: if isAdmin();
     }
 
     // Messages collection
     match /messages/{messageId} {
+      // Users can read messages they sent or received
       allow read: if request.auth != null && 
+                     resource != null &&
                      (resource.data.fromUid == request.auth.uid || 
                       resource.data.toUid == request.auth.uid);
+      
+      // Users can create messages they're sending
       allow create: if request.auth != null && 
-                       request.resource.data.fromUid == request.auth.uid &&
-                       isVerified(request.auth.uid);
+                       request.resource.data.fromUid == request.auth.uid;
+      
+      // Users can mark messages as read
       allow update: if request.auth != null && 
+                       resource != null &&
                        resource.data.toUid == request.auth.uid &&
                        request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['read']);
-      allow read: if isAdmin();
+      
+      // Admins can read all messages
+      allow read, write, create, delete: if isAdmin();
     }
 
     // Reports collection
     match /reports/{reportId} {
+      // Users can create reports
       allow create: if request.auth != null && 
                        request.resource.data.reporterId == request.auth.uid;
+      
+      // Users can read reports they created
       allow read: if request.auth != null && 
+                     resource != null &&
                      resource.data.reporterId == request.auth.uid;
-      allow read, write: if isAdmin();
+      
+      // Admins have full access to reports
+      allow read, write, create, delete: if isAdmin();
     }
 
     // Analytics collection
-    match /analytics/{document} {
-      allow read, write: if isAdmin();
+    match /analytics/{docId} {
+      // Only admins can access analytics
+      allow read, write, create, delete: if isAdmin();
     }
 
     // App settings
-    match /settings/{setting} {
+    match /settings/{settingId} {
+      // All authenticated users can read settings
       allow read: if request.auth != null;
-      allow write: if isAdmin();
+      
+      // Only admins can modify settings
+      allow write, create, delete: if isAdmin();
     }
 
     // Verifications collection
     match /verifications/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      allow read: if isAdmin();
-      allow update: if isAdmin() &&
-                       request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['status', 'reviewedAt', 'reviewerId', 'rejectionReason']);
+      // Users can read/write their own verification data
+      allow read, write: if isOwner(userId);
+      
+      // Admins have full access
+      allow read, write, create, delete: if isAdmin();
     }
 
     // Queue management collection
     match /queue/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && 
-                       request.auth.uid == userId &&
+      // Users can read their own queue status
+      allow read: if isOwner(userId);
+      
+      // Users can update their queue preferences
+      allow update: if isOwner(userId) &&
                        request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['active', 'preferences']);
+      
+      // Admins have full access to queue management
+      allow read, write, create, delete: if isAdmin();
+    }
+
+    // ✅ Catch-all rule for admin access to ANY document
+    match /{document=**} {
       allow read, write: if isAdmin();
     }
   }

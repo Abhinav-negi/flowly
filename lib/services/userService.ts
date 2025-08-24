@@ -1,5 +1,3 @@
-// lib/services/userService.ts
-
 import {
   collection,
   doc,
@@ -12,6 +10,7 @@ import {
   where,
   getDoc,
   DocumentData,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { sendNotification } from "@/lib/notificationService";
@@ -24,6 +23,7 @@ import type {
   UserProfile,
   DateCard,
   Message,
+  VerificationStatus,
 } from "../types/userProfile";
 
 /**
@@ -45,7 +45,7 @@ export async function createUserProfileOnSignup(
       verification: {
         photoVerified: false,
         idVerified: false,
-        verificationStatus: "pending",
+        verificationStatus: "pending" as VerificationStatus,
       },
       inQueue: false,
       queueTimer: 0,
@@ -84,7 +84,7 @@ export async function checkUserExists(uid: string): Promise<boolean> {
 }
 
 /**
- * Find matches
+ * Find matches for user
  */
 export async function findMatchesForUser(
   uid: string
@@ -111,7 +111,6 @@ export async function findMatchesForUser(
     const otherProfile = docSnapToUserProfile(otherUid, docSnap);
     if (!otherProfile) return;
 
-    // gender filter
     if (
       interestedIn.length > 0 &&
       otherProfile.gender &&
@@ -142,7 +141,7 @@ export async function setUserInQueue(
 }
 
 /**
- * Mark a match
+ * Add a match between two users
  */
 export async function addMatch(uid: string, otherUid: string) {
   const ref = getUserDocRef(uid);
@@ -196,14 +195,158 @@ export async function getUserWithDates(uid: string): Promise<{
   const snap = await fetchUserDocSnapshot(uid);
   if (!snap.exists()) return null;
   const data = snap.data() as DocumentData;
+
+  const currentTime = Date.now();
+  const dateCards: DateCard[] = Array.isArray(data.dateCards)
+    ? data.dateCards
+        .filter(
+          (card: DateCard) =>
+            new Date(card.time).getTime() > currentTime - 2 * 60 * 60 * 1000
+        )
+        .map((card: DateCard) => ({
+          ...card,
+          isRevealed: currentTime >= (card.revealAt || 0),
+        }))
+    : [];
+
   return {
     uid,
     name: data.name ?? "",
     email: data.email,
-    dateCards: Array.isArray(data.dateCards) ? data.dateCards : [],
+    dateCards,
   };
 }
 
+/**
+ * Create a detailed date card with 10-minute reveal before date time
+ */
+export async function createDateCard(
+  userUid: string,
+  matchUid: string,
+  dateDetails: {
+    time: string;
+    location: string;
+    description: string;
+    suggestedActivity?: string;
+    dressCode?: string;
+    specialInstructions?: string;
+  }
+) {
+  const dateTime = new Date(dateDetails.time).getTime();
+  const revealAt = dateTime - 10 * 60 * 1000;
+
+  const dateCard: DateCard = {
+    matchUid,
+    time: dateDetails.time,
+    location: dateDetails.location,
+    description: dateDetails.description,
+    specialInstructions: dateDetails.specialInstructions,
+    userAccepted: false,
+    otherAccepted: false,
+    confirmed: false,
+    revealAt,
+    createdAt: Date.now(),
+    isRevealed: false,
+  };
+
+  const userRef = getUserDocRef(userUid);
+  const matchRef = getUserDocRef(matchUid);
+
+  await updateDoc(userRef, {
+    dateCards: arrayUnion(dateCard),
+    updatedAt: serverTimestamp(),
+  });
+
+  const reverseDateCard: DateCard = {
+    ...dateCard,
+    matchUid: userUid,
+  };
+
+  await updateDoc(matchRef, {
+    dateCards: arrayUnion(reverseDateCard),
+    updatedAt: serverTimestamp(),
+  });
+
+  scheduleDateRevealNotification(userUid, matchUid, dateDetails.time, revealAt);
+
+  await sendNotification(userUid, {
+    title: "Date Scheduled!",
+    body: "You have a date scheduled. Details will be revealed 10 minutes before the date time.",
+    type: "date_scheduled",
+    anchor: "/dates",
+  });
+
+  await sendNotification(matchUid, {
+    title: "Date Scheduled!",
+    body: "You have a date scheduled. Details will be revealed 10 minutes before the date time.",
+    type: "date_scheduled",
+    anchor: "/dates",
+  });
+
+  return dateCard;
+}
+
+/**
+ * Schedule notification for date reveal
+ */
+function scheduleDateRevealNotification(
+  userUid: string,
+  matchUid: string,
+  dateTime: string,
+  revealAt: number
+) {
+  const timeUntilReveal = revealAt - Date.now();
+
+  if (timeUntilReveal > 0) {
+    setTimeout(async () => {
+      await updateDateRevealStatus(userUid, matchUid, true);
+      await updateDateRevealStatus(matchUid, userUid, true);
+
+      await sendNotification(userUid, {
+        title: "Date Details Revealed!",
+        body: `Your date details are now available. The date is at ${new Date(
+          dateTime
+        ).toLocaleTimeString()}.`,
+        type: "date_reveal",
+        anchor: "/dates",
+      });
+
+      await sendNotification(matchUid, {
+        title: "Date Details Revealed!",
+        body: `Your date details are now available. The date is at ${new Date(
+          dateTime
+        ).toLocaleTimeString()}.`,
+        type: "date_reveal",
+        anchor: "/dates",
+      });
+    }, timeUntilReveal);
+  }
+}
+
+/**
+ * Update date reveal status
+ */
+async function updateDateRevealStatus(
+  uid: string,
+  matchUid: string,
+  isRevealed: boolean
+) {
+  const userObj = await getUserWithDates(uid);
+  if (!userObj) return;
+
+  const updated = userObj.dateCards.map((card) =>
+    card.matchUid === matchUid ? { ...card, isRevealed } : card
+  );
+
+  await updateDoc(getUserDocRef(uid), {
+    dateCards: updated,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Update date card
+ */
 export async function updateDateCard(
   uid: string,
   matchUid: string,
@@ -211,9 +354,11 @@ export async function updateDateCard(
 ) {
   const userObj = await getUserWithDates(uid);
   if (!userObj) return;
+
   const updated = userObj.dateCards.map((card) =>
     card.matchUid === matchUid ? { ...card, ...updates } : card
   );
+
   await updateDoc(getUserDocRef(uid), {
     dateCards: updated,
     updatedAt: serverTimestamp(),
@@ -256,6 +401,13 @@ export async function sendMessage(
 
   const ref2 = doc(collection(db, "users", toUid, "messages"));
   await setDoc(ref2, message);
+
+  await sendNotification(toUid, {
+    title: "New Message",
+    body: `You have a new message from ${fromUid}`,
+    type: "message",
+    anchor: "/chat",
+  });
 }
 
 /**
@@ -271,3 +423,102 @@ export function onUnreadNotificationsCount(
   );
   return onSnapshot(q, (snap) => cb(snap.size));
 }
+
+/**
+ * Verification helpers
+ */
+export async function getUserVerificationStatus(
+  uid: string
+): Promise<VerificationStatus> {
+  const snap = await fetchUserDocSnapshot(uid);
+  if (!snap.exists()) return "pending";
+
+  const data = snap.data() as DocumentData;
+  return data.verification?.verificationStatus || "pending";
+}
+
+export async function updateVerificationStatus(
+  uid: string,
+  status: VerificationStatus,
+  notes?: string
+) {
+  const ref = getUserDocRef(uid);
+  await updateDoc(ref, {
+    "verification.verificationStatus": status,
+    "verification.verificationNotes": notes,
+    updatedAt: serverTimestamp(),
+  });
+
+  await sendNotification(uid, {
+    title: "Verification Update",
+    body: `Your verification status has been updated to: ${status}`,
+    type: "verification",
+    anchor: "/profile",
+  });
+}
+
+/**
+ * Clean up old dates
+ */
+export async function cleanupOldDates(uid: string) {
+  const userObj = await getUserWithDates(uid);
+  if (!userObj) return;
+
+  const currentTime = Date.now();
+  const activeDateCards = userObj.dateCards.filter(
+    (card) =>
+      new Date(card.time).getTime() > currentTime - 2 * 60 * 60 * 1000
+  );
+
+  if (activeDateCards.length < userObj.dateCards.length) {
+    await updateDoc(getUserDocRef(uid), {
+      dateCards: activeDateCards,
+      updatedAt: serverTimestamp(),
+    });
+  }
+}
+
+/**
+ * Respond to a date (accept or decline) ✅ fixed version
+ */
+export const respondToDate = async (
+  userId: string,
+  matchUid: string,
+  response: "accept" | "decline",
+  reason?: string
+) => {
+  const userRef = doc(db, "users", userId);
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) return;
+
+  const userData = userSnap.data() as UserProfile;
+
+  const updatedCards = userData.dateCards?.map((card) => {
+    if (card.matchUid === matchUid) {
+      if (response === "accept") {
+        card.userAccepted = true;
+        card.declineReason = undefined; // clear any past rejection
+      } else if (response === "decline") {
+        card.userAccepted = false;
+        card.declineReason = reason || "No reason provided";
+      }
+      card.confirmed = card.userAccepted && card.otherAccepted ? true : false;
+    }
+    return card;
+  });
+
+  await updateDoc(userRef, { dateCards: updatedCards, updatedAt: serverTimestamp() });
+
+  // Notify other user
+  await sendNotification(matchUid, {
+    title: response === "accept" ? "Date Accepted" : "Date Declined",
+    body:
+      response === "accept"
+        ? `${userData.name || "Your match"} accepted the date.`
+        : `${userData.name || "Your match"} declined the date${
+            reason ? `: "${reason}"` : "."
+          }`,
+    type: response === "accept" ? "date_accept" : "date_decline",
+    anchor: "/dates",
+  });
+};

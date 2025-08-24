@@ -1,7 +1,11 @@
 export type DietaryPreference = "veg" | "non-veg" | "vegan" | "other";
 export type WorkLifeStatus = "job" | "student" | "exam" | "other";
 export type Gender = "male" | "female" | "other";
-export type VerificationStatus = "pending" | "in_review" | "verified" | "rejected";
+export type VerificationStatus =
+  | "pending"
+  | "in_review"
+  | "verified"
+  | "rejected";
 
 export interface Verification {
   photoVerified: boolean;
@@ -14,16 +18,28 @@ export interface Verification {
 
 export interface DateCard {
   matchUid: string;
-  time: string;          // e.g., ISO string
+  time: string; // e.g., ISO string
   location: string;
+  description: string;
+  specialInstructions?: string;
   userAccepted?: boolean;
   otherAccepted?: boolean;
   confirmed?: boolean;
-  revealAt?: number;      // timestamp when date info is revealed
-  appealRequest?: {       // optional: for proposing new date/time
+  revealAt?: number; // timestamp when date info is revealed
+  appealRequest?: {
+    // optional: for proposing new date/time
     proposedTime: string;
     status: "pending" | "accepted" | "rejected";
   };
+  createdAt?: number;
+  isRevealed: boolean;
+
+    // 👇 NEW: record declines cleanly
+  declined?: boolean;
+  declinedBy?: string;       // uid of the person who declined
+  declineReason?: string;    // reason text
+  declinedAt?: number;       // timestamp
+  //  rejectionReason?: string; // ✅ new optional field
 }
 
 export interface Message {
@@ -59,7 +75,7 @@ export interface UserProfile {
 
   verification: Verification;
   inQueue: boolean;
-  queueTimer: number;           // countdown timer in seconds
+  queueTimer: number; // countdown timer in seconds
   matchedUsers: string[];
   likesSent: string[];
   likesReceived: string[];
