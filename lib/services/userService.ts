@@ -497,7 +497,7 @@ export const respondToDate = async (
     if (card.matchUid === matchUid) {
       if (response === "accept") {
         card.userAccepted = true;
-        card.declineReason = undefined; // clear any past rejection
+        card.declineReason = null; // clear any past rejection
       } else if (response === "decline") {
         card.userAccepted = false;
         card.declineReason = reason || "No reason provided";

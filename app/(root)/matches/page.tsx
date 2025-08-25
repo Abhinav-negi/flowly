@@ -312,11 +312,11 @@ export default function MatchesPage() {
                   ✅ Date Confirmed! Meet at <strong>{card.location}</strong>
                 </div>
               ) : card.userAccepted ? (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-700 text-sm">
+                <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
                   Waiting for the other user to accept...
                 </div>
               ) : card.otherAccepted ? (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-700 text-sm">
+                <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
                   The other user accepted. Please respond.
                 </div>
               ) : (

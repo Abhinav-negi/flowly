@@ -37,7 +37,7 @@ export interface DateCard {
     // 👇 NEW: record declines cleanly
   declined?: boolean;
   declinedBy?: string;       // uid of the person who declined
-  declineReason?: string;    // reason text
+  declineReason?: string | null;    // reason text
   declinedAt?: number;       // timestamp
   //  rejectionReason?: string; // ✅ new optional field
 }
