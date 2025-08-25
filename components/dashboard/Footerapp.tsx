@@ -1,4 +1,5 @@
 import Image from "next/image";
+import SocialLinks from "../SocialLinks";
 
 export default function Footerz() {
   return (
@@ -25,14 +26,7 @@ export default function Footerz() {
         {/* Socials + Contact */}
         <div>
           <h2 className="font-bold text-[#E05265] mb-3">Follow Us</h2>
-          <div className="flex gap-4 mb-4">
-            <a href="#" aria-label="Follow Flowly on Twitter" className="text-[#7c706a]">
-              Twitter
-            </a>
-            <a href="#" aria-label="Follow Flowly on Instagram" className="text-[#7c706a]">
-              Instagram
-            </a>
-          </div>
+         <SocialLinks/>
 
           <h2 className="font-bold text-[#E05265] mb-2">Contact</h2>
           <p className="text-sm text-[#7c706a]">
