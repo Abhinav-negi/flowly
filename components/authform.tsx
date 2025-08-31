@@ -34,6 +34,7 @@ const baseSchema = {
   email: z.string().email("Enter a valid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 };
+
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   mobile: z
@@ -42,8 +43,12 @@ const signupSchema = z.object({
     .max(20, "Enter a valid phone")
     .regex(/^[\d+\-\s()]*$/, "Only digits and (+- ) allowed"),
   gender: z.enum(["male", "female", "other"]),
+  acceptTerms: z.boolean().refine(val => val === true, {
+    message: "You must accept the Terms and Conditions to continue",
+  }),
   ...baseSchema,
 });
+
 const signinSchema = z.object(baseSchema);
 
 type SignUpValues = z.infer<typeof signupSchema>;
@@ -73,13 +78,14 @@ function mapFirebaseError(code?: string) {
 export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const router = useRouter();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(mode === "signup" ? signupSchema : signinSchema),
     defaultValues:
       mode === "signup"
-        ? { name: "", mobile: "", gender: "male", email: "", password: "" }
+        ? { name: "", mobile: "", gender: "male", email: "", password: "", acceptTerms: false }
         : { email: "", password: "" },
   });
 
@@ -93,7 +99,7 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
       const password = (values as SignUpValues | SignInValues).password;
 
       if (mode === "signup") {
-        const { name,  } = values as SignUpValues;
+        const { name } = values as SignUpValues;
         const userCredential = await signUpWithEmail(email, password);
         const uid = userCredential.user.uid;
 
@@ -156,153 +162,208 @@ export function AuthForm({ mode }: { mode: "signin" | "signup" }) {
     }
   }
 
+  // Check if form is valid for submission
+  const isFormValid = mode === "signup" ? 
+    form.formState.isValid && form.watch("acceptTerms") === true : 
+    form.formState.isValid;
+
+
+
   return (
-    <Form {...form}>
-      <form
-        onSubmit={form.handleSubmit(onSubmit)}
-        className="w-full space-y-6 mt-3 bg-white rounded-xl p-6 sm:p-8 shadow-md"
-      >
-        <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 text-center">
-          {mode === "signup" ? "Create Account" : "Login"}
-        </h2>
-
-        {errorMsg && (
-          <p className="text-red-500 text-sm" aria-live="polite">
-            {errorMsg}
-          </p>
-        )}
-
-        {mode === "signup" && (
-          <>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" autoComplete="name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="mobile"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Mobile Number</FormLabel>
-                  <FormControl>
-                    <Input placeholder="1234567890" inputMode="tel" autoComplete="tel" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gender</FormLabel>
-                  <FormControl>
-                    <select {...field} className="border p-2 rounded w-full" aria-label="Gender">
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </>
-        )}
-
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email Address</FormLabel>
-              <FormControl>
-                <Input
-                  placeholder="example@mail.com"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  {...field}
-                  onChange={(e) => field.onChange(e.target.value.trim())}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
-              <FormControl>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <Button
-          type="submit"
-          disabled={loading}
-          aria-busy={loading}
-          className="w-full bg-[#E05265] hover:bg-[#E05265]/90 text-white"
+    <>
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="w-full space-y-6 mt-3 bg-white rounded-xl p-6 sm:p-8 shadow-md"
         >
-          {mode === "signup" ? "Sign Up" : "Login"}
-        </Button>
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 text-center">
+            {mode === "signup" ? "Create Account" : "Login"}
+          </h2>
 
-        <Button
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={loading}
-          aria-busy={loading}
-          className="w-full border bg-white text-gray-700 flex items-center gap-2"
-        >
-          <Image
-            src="https://www.svgrepo.com/show/355037/google.svg"
-            alt="Google"
-            width={20}
-            height={20}
+          {errorMsg && (
+            <p className="text-red-500 text-sm" aria-live="polite">
+              {errorMsg}
+            </p>
+          )}
+
+          {mode === "signup" && (
+            <>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Doe" autoComplete="name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="mobile"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mobile Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="1234567890" inputMode="tel" autoComplete="tel" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Gender</FormLabel>
+                    <FormControl>
+                      <select {...field} className="border p-2 rounded w-full" aria-label="Gender">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </>
+          )}
+
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email Address</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="example@mail.com"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    {...field}
+                    onChange={(e) => field.onChange(e.target.value.trim())}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-          Sign in with Google
-        </Button>
 
-        <div className="text-center text-sm text-gray-600">
-          {mode === "signup" ? (
-            <p>
-              Already have an account?{" "}
-              <Link href="/sign-in" className="text-[#E05265] hover:underline">
-                Login
-              </Link>
-            </p>
-          ) : (
-            <p>
-              Don&apos;t have an account?{" "}
-              <Link href="/sign-up" className="text-[#E05265] hover:underline">
-                Sign Up
-              </Link>
-            </p>
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input
+                    type="password"
+                    placeholder="••••••••"
+                    autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Terms and Conditions Checkbox - Only for Signup */}
+          {mode === "signup" && (
+            <FormField
+              control={form.control}
+              name="acceptTerms"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-start space-x-3">
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4 text-[#E05265]  border-gray-300 rounded focus:ring-[#E05265] focus:ring-2 mt-1"
+                        id="acceptTerms"
+                      />
+                    </FormControl>
+                    <div className="flex-1">
+                      <label htmlFor="acceptTerms" className="text-sm text-gray-700 cursor-pointer">
+                        I agree to the{" "}
+                        <Link 
+                          href="/terms-and-conditions" 
+                          className="text-[#E05265] hover:underline font-medium"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Terms and Conditions
+                        </Link>{" "}
+                        and{" "}
+                        <Link 
+                          href="/privacy-policy" 
+                          className="text-[#E05265] hover:underline font-medium"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Privacy Policy
+                        </Link>
+                      </label>
+                    </div>
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           )}
-        </div>
-      </form>
-    </Form>
+
+          <Button
+            type="submit"
+            disabled={loading || !isFormValid}
+            aria-busy={loading}
+            className="w-full bg-[#E05265] hover:bg-[#E05265]/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Creating Account..." : (mode === "signup" ? "Sign Up" : "Login")}
+          </Button>
+
+          <Button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading || (mode === "signup" && !form.watch("acceptTerms"))}
+            aria-busy={loading}
+            className="w-full border bg-white text-gray-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Image
+              src="https://www.svgrepo.com/show/355037/google.svg"
+              alt="Google"
+              width={20}
+              height={20}
+            />
+            {loading ? "Signing in..." : "Sign in with Google"}
+          </Button>
+
+          <div className="text-center text-sm text-gray-600">
+            {mode === "signup" ? (
+              <p>
+                Already have an account?{" "}
+                <Link href="/sign-in" className="text-[#E05265] hover:underline">
+                  Login
+                </Link>
+              </p>
+            ) : (
+              <p>
+                Don&apos;t have an account?{" "}
+                <Link href="/sign-up" className="text-[#E05265] hover:underline">
+                  Sign Up
+                </Link>
+              </p>
+            )}
+          </div>
+        </form>
+      </Form>
+    </>
   );
 }
