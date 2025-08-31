@@ -4,7 +4,7 @@ import { FaHeart, FaMusic, FaFilm, FaCoffee } from "react-icons/fa";
 const ProfilePreview = () => {
   return (
     <div className="min-h-screen mt-6 ">
-      <div className="max-w-sm mx-auto bg-white rounded-lg shadow p-6 border border-gray-200 space-y-12">
+      <div className="max-w-sm mx-auto  bg-white rounded-lg shadow p-6 border border-gray-200 space-y-12">
  
       <h2 className="text-center text-xl font-semibold text-gray-800 mb-2">
         Profile Preview

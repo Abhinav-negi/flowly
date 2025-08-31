@@ -12,6 +12,7 @@ import {
 } from "@/lib/types/userProfile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LocationSection } from "../ui/locationButton";
 
 // --- Helper: calculate age from DOB
 function calculateAge(dob: string): number | undefined {
@@ -82,7 +83,7 @@ export default function ProfileForm() {
           institute: "",
           course: "",
           location: "",
-          datingPreference: undefined,
+          datingPreference: undefined,   
         } as UserProfile);
       }
       setLoading(false);
@@ -139,6 +140,7 @@ export default function ProfileForm() {
       [field]: prev![field]!.filter((_, i) => i !== index),
     }));
   };
+  
 
   return (
     <div className="space-y-6">
@@ -188,15 +190,8 @@ export default function ProfileForm() {
       </div>
 
       {/* Location */}
-      <div>
-        <label className="block text-gray-700 font-medium mb-1">Location</label>
-        <Input
-          value={profile.location || ""}
-          onChange={handleInputChange("location")}
-          className="bg-[#FAF7F5]"
-          placeholder="City, Country"
-        />
-      </div>
+
+      <LocationSection profile={profile} setProfile={setProfile} />
 
       {/* Gender */}
       <div>

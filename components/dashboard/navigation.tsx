@@ -18,10 +18,12 @@ import { onAuthStateChanged, User } from "firebase/auth";
 const navItems = [
   { name: "Dashboard", href: "/dashboard" },
   { name: "Profile", href: "/profile" },
+  { name: "Preference & LifeStyle", href: "/pref&ls" },
   { name: "Verification", href: "/verification" },
   { name: "Matches", href: "/matches" },
   { name: "Notifications", href: "/notifications" },
   { name: "Settings", href: "/settings" },
+  
 ];
 
 export default function Navigation() {

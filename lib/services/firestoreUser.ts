@@ -49,10 +49,9 @@ export function docSnapToUserProfile(
     course: data.course ?? undefined,
     datingPreference: data.datingPreference ?? undefined,
     location: data.location ?? "",
+    lat: data.lat ?? undefined,
+    lng: data.lng ?? undefined,
     gender: data.gender,
-    interestedIn: Array.isArray(data.interestedIn)
-      ? (data.interestedIn as UserProfile["interestedIn"])
-      : [],
     dietaryPreference: data.dietaryPreference,
     workLifeStatus: data.workLifeStatus,
     studyField: data.studyField,
@@ -66,7 +65,7 @@ export function docSnapToUserProfile(
     verification: data.verification ?? {
       photoVerified: false,
       idVerified: false,
-      verificationStatus: "pending",
+      verificationStatus: "pending" as const,
     },
     inQueue: data.inQueue ?? false,
     queueTimer: data.queueTimer ?? 0,
@@ -74,5 +73,57 @@ export function docSnapToUserProfile(
     likesSent: Array.isArray(data.likesSent) ? data.likesSent : [],
     likesReceived: Array.isArray(data.likesReceived) ? data.likesReceived : [],
     dateCards: Array.isArray(data.dateCards) ? data.dateCards : [],
+
+    // Additional optional fields
+    profileComplete: data.profileComplete ?? undefined,
+    notifyBeforeMinutes: data.notifyBeforeMinutes ?? undefined,
+
+    // Personality Test Fields
+    testCompleted: data.testCompleted ?? undefined,
+    personalityType: data.personalityType ?? null,
+    scores: data.scores ?? null,
+    completedAt: data.completedAt ?? undefined,
+    skippedAt: data.skippedAt ?? undefined,
+
+    // Preferences & Lifestyle fields - mapping to the structure defined in UserProfile
+    preferences: {
+      interestedIn: data.preferences?.interestedIn ?? 
+                   data.interestedIn ?? 
+                   "everyone",
+      distancePreference: data.preferences?.distancePreference ?? 
+                         data.distancePreference ?? 
+                         25,
+      lifestyle: {
+        workout: data.preferences?.lifestyle?.workout ?? 
+                data.workout ?? 
+                undefined,
+        drinking: data.preferences?.lifestyle?.drinking ?? 
+                 data.drinking ?? 
+                 undefined,
+        smoking: data.preferences?.lifestyle?.smoking ?? 
+                data.smoking ?? 
+                undefined,
+        education: data.preferences?.lifestyle?.education ?? 
+                  data.education ?? 
+                  undefined,
+        lookingFor: data.preferences?.lifestyle?.lookingFor ?? 
+                   data.lookingFor ?? 
+                   undefined,
+        height: data.preferences?.lifestyle?.height ?? 
+               data.height ?? 
+               undefined,
+        religion: data.preferences?.lifestyle?.religion ?? 
+                 data.religion ?? 
+                 undefined,
+      }
+    },
+
+    ageRangePreference: data.ageRangePreference ?? (
+      data.minAge && data.maxAge ? {
+        minAge: data.minAge,
+        maxAge: data.maxAge
+      } : undefined
+    ),
+    preferencesCompleted: data.preferencesCompleted ?? false,
   };
 }

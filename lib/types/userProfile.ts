@@ -16,10 +16,16 @@ export interface Verification {
   livePhotoUrl?: string;
 }
 
+export interface AgeRangePreference {
+  minAge: number;
+  maxAge: number;
+}
+
 export interface DateCard {
   matchUid: string;
   time: string; // e.g., ISO string
   location: string;
+
   description: string;
   specialInstructions?: string;
   userAccepted?: boolean;
@@ -34,11 +40,11 @@ export interface DateCard {
   createdAt?: number;
   isRevealed: boolean;
 
-    // 👇 NEW: record declines cleanly
+  // 👇 NEW: record declines cleanly
   declined?: boolean;
-  declinedBy?: string;       // uid of the person who declined
-  declineReason?: string | null;    // reason text
-  declinedAt?: number;       // timestamp
+  declinedBy?: string; // uid of the person who declined
+  declineReason?: string | null; // reason text
+  declinedAt?: number; // timestamp
   //  rejectionReason?: string; // ✅ new optional field
 }
 
@@ -58,9 +64,10 @@ export interface UserProfile {
   mobileNumber?: string;
   instagramHandle?: string;
   age?: number;
-  location?: string;
+  location: string;
+  lat?: number;
+  lng?: number;
   gender?: Gender;
-  interestedIn?: Gender[];
   dietaryPreference?: DietaryPreference;
   workLifeStatus?: WorkLifeStatus;
   studyField?: string;
@@ -88,4 +95,47 @@ export interface UserProfile {
   // Fixed: timestamps
   createdAt?: number;
   updatedAt?: number;
+
+
+    // ✅ Personality Test Fields
+  testCompleted?: boolean;
+  personalityType?: string | null;
+  scores?: {
+    A: number;
+    N: number;
+    T: number;
+    L: number;
+    D: number;
+    C: number;
+  } | null;
+  completedAt?: number;
+  skippedAt?: number;
+  
+    // ✅ New Preferences & Lifestyle fields
+  preferences?: {
+    interestedIn: "men" | "women" | "everyone";
+    distancePreference: number; // in km
+    lifestyle: {
+      workout?: "regularly" | "sometimes" | "never";
+      drinking?: "yes" | "socially" | "no";
+      smoking?: "yes" | "sometimes" | "no";
+      education?: "high_school" | "in_college" | "bachelors" | "masters" | "phd" |"posgraduation" |"undergraduation";
+      lookingFor?: "life_partner" | "casual" | "friendship" | "not_sure";
+      height?: string; // e.g., "5'10", "178 cm"
+      religion?:
+        | "hindu"
+        | "muslim"
+        | "christian"
+        | "sikh"
+        | "buddhist"
+        | "jain"
+        | "other";
+    };
+  };
+
+    ageRangePreference?: AgeRangePreference;
+  preferencesCompleted?: boolean;
+
+
 }
+
