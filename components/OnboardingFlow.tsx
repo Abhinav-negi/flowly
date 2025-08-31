@@ -41,13 +41,13 @@ const Welcome = ({ onStart }: { onStart: () => void }) => (
     <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 w-full max-w-lg shadow-2xl text-center min-h-[560px] md:min-h-[620px] flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-2">
         <div className="w-20 h-20 bg-[#FAF7F5] rounded-full mb-6 flex items-center justify-center">
-          <Image src="/assets/logo/heart.png" alt="Flowly Logo" height={40} width={40} priority />
+          <Image src="/assets/logo/heart.png" alt="Flowly Logo" height={65} width={65} priority />
         </div>
         <h2 className="font-secondary text-3xl md:text-4xl text-[#E05265] mb-4">Welcome to Flowly</h2>
         <p className="text-[#7C706A] font-app text-base md:text-lg leading-relaxed mb-6 max-w-[520px]">
           Let&apos;s set up your preferences so we can find great matches for you. This takes ~2 minutes.
         </p>
-        <div className="bg-[#FAF7F5] rounded-2xl p-4 mb-6 text-sm text-[#7C706A] text-left w-full max-w-sm">
+        <div className="flex flex-col justify-center items-center bg-[#FAF7F5] rounded-2xl p-4 mb-6 text-sm text-[#7C706A] text-left w-full max-w-sm">
           <div>💖 Personalize your experience</div>
           <div>🎯 Better matches from day one</div>
           <div>✨ You can edit later in Settings</div>
@@ -156,8 +156,8 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     <div className="min-h-screen w-full flex items-center justify-center p-4" style={{ background: "linear-gradient(to bottom, #FAF7F5, #E05265)" }}>
       <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl min-h-[560px] md:min-h-[620px] flex flex-col">
         <div className="flex-0">
-          <div className="w-14 h-14 bg-[#FAF7F5] rounded-full mb-6 flex items-center justify-center mx-auto">
-            <Image src="/assets/logo/heart.png" alt="Flowly Logo" width={30} height={30} />
+          <div className="w-24 h-24 bg-[#FAF7F5] rounded-full mb-1 flex items-center justify-center mx-auto">
+            <Image src="/assets/logo/heart.png" alt="Flowly Logo" width={65} height={65} />
           </div>
         </div>
 
@@ -545,7 +545,7 @@ export default function OnboardingFlow({ onSubmit }: Props) {
       <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 w-full max-w-lg shadow-2xl text-center min-h-[560px] md:min-h-[620px] flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-1">
           <div className="w-20 h-20 bg-[#FAF7F5] rounded-full mx-auto mb-6 flex items-center justify-center">
-            <Image src="/assets/logo/heart.png" alt="Flowly Logo" height={40} width={40} />
+            <Image src="/assets/logo/heart.png" alt="Flowly Logo" height={65} width={65} />
           </div>
           <h2 className="font-secondary text-3xl md:text-4xl text-[#E05265] mb-4">All set 🎉</h2>
           <p className="text-[#7C706A] font-app text-base md:text-lg leading-relaxed mb-6">

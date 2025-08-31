@@ -5,6 +5,8 @@ import Link from "next/link";
 const links = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/profile", label: "Profile" },
+    { name: "Preference & LifeStyle", href: "/pref&ls" },
+ 
   { href: "/dashboard/verification", label: "Verify" },
   { href: "/dashboard/matches", label: "Matches" },
   { href: "/dashboard/settings", label: "Settings" },
