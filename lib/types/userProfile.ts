@@ -19,32 +19,6 @@ export interface AgeRangePreference {
   minAge: number;
   maxAge: number;
 }
-
-export interface DateCard {
-  matchUid: string;
-  time: string; // e.g., ISO string
-  location: string;
-  description: string;
-  specialInstructions?: string;
-  userAccepted?: boolean;
-  otherAccepted?: boolean;
-  confirmed?: boolean;
-  revealAt?: number; // timestamp when date info is revealed
-  appealRequest?: {
-    // optional: for proposing new date/time
-    proposedTime: string;
-    status: "pending" | "accepted" | "rejected";
-  };
-  createdAt?: number;
-  isRevealed: boolean;
-
-  // ✅ Updated decline handling
-  declined?: boolean;
-  declinedBy?: string; // uid of the person who declined
-  declineReason?: string | null; // reason text
-  declinedAt?: number; // timestamp
-}
-
 export interface Message {
   fromUid: string;
   toUid: string;
@@ -53,7 +27,58 @@ export interface Message {
   read: boolean;
 }
 
+// Updated types for the new architecture
+
+export interface Match {
+  id: string;
+  users: [string, string]; // [user1Id, user2Id]
+  createdAt: number;
+  status: "active" | "ended" | "blocked";
+  createdBy: "admin" | "system";
+}
+
+export interface DateCard {
+  id: string;
+  matchId: string;
+  users: [string, string]; // [user1Id, user2Id]
+  time: string; // ISO string
+  location: string;
+  description: string;
+  specialInstructions?: string;
+
+  // Response tracking
+  responses: {
+    [userId: string]: {
+      status: "pending" | "accepted" | "declined";
+      respondedAt?: number;
+      declineReason?: string;
+    };
+  };
+
+  // Overall status
+  status: "pending" | "confirmed" | "cancelled" | "completed";
+  confirmedAt?: number;
+  cancelledAt?: number;
+
+  // Reveal timing
+  revealAt?: number;
+  isRevealed: boolean;
+
+  // Appeal/rescheduling
+  appealRequest?: {
+    requestedBy: string;
+    proposedTime: string;
+    proposedLocation?: string;
+    status: "pending" | "accepted" | "rejected";
+    createdAt: number;
+  };
+
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface UserProfile {
+  // Remove dateCards from user profile
   userId: string;
   email: string;
   name: string;
@@ -79,21 +104,17 @@ export interface UserProfile {
 
   verification: Verification;
   inQueue: boolean;
-  queueTimer: number; // countdown timer in seconds
+  queueTimer: number;
   matchedUsers: string[];
   likesSent: string[];
   likesReceived: string[];
-  dateCards?: DateCard[];
 
-  // Additional optional fields
   profileComplete?: boolean;
   notifyBeforeMinutes?: number;
 
-  // Fixed: timestamps
   createdAt?: number;
   updatedAt?: number;
 
-  // ✅ Personality Test Fields
   testCompleted?: boolean;
   personalityType?: string | null;
   scores?: {
@@ -107,10 +128,9 @@ export interface UserProfile {
   completedAt?: number;
   skippedAt?: number;
 
-  // ✅ New Preferences & Lifestyle fields
   preferences?: {
     interestedIn: "men" | "women" | "everyone";
-    distancePreference: number; // in km
+    distancePreference: number;
     lifestyle: {
       workout?: "regularly" | "sometimes" | "never";
       drinking?: "yes" | "socially" | "no";
@@ -124,7 +144,7 @@ export interface UserProfile {
         | "posgraduation"
         | "undergraduation";
       lookingFor?: "life_partner" | "casual" | "friendship" | "not_sure";
-      height?: string; // e.g., "5'10", "178 cm"
+      height?: string;
       religion?:
         | "hindu"
         | "muslim"

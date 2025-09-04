@@ -72,7 +72,7 @@ export function docSnapToUserProfile(
     matchedUsers: Array.isArray(data.matchedUsers) ? data.matchedUsers : [],
     likesSent: Array.isArray(data.likesSent) ? data.likesSent : [],
     likesReceived: Array.isArray(data.likesReceived) ? data.likesReceived : [],
-    dateCards: Array.isArray(data.dateCards) ? data.dateCards : [],
+    // dateCards: Array.isArray(data.dateCards) ? data.dateCards : [],
 
     // Additional optional fields
     profileComplete: data.profileComplete ?? undefined,

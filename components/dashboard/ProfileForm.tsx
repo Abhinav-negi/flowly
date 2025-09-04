@@ -48,7 +48,7 @@ export default function ProfileForm() {
           age: data.dob ? calculateAge(data.dob) : undefined,
           interests: data.interests || [],
           hobbies: data.hobbies || [],
-          dateCards: data.dateCards || [],
+          // dateCards: data.dateCards || [],
         });
       } else {
         setProfile({

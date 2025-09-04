@@ -82,7 +82,7 @@ export async function getProfile(uid: string): Promise<UserProfile | null> {
         notifyBeforeMinutes: rawData.notifyBeforeMinutes,
         createdAt: rawData.createdAt,
         updatedAt: rawData.updatedAt,
-        dateCards: rawData.dateCards
+        // dateCards: rawData.dateCards
       };
       
       console.log("📄 Direct profile testCompleted:", directProfile.testCompleted);
@@ -207,7 +207,7 @@ export async function getProfileFromServer(uid: string): Promise<UserProfile | n
       notifyBeforeMinutes: data.notifyBeforeMinutes,
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
-      dateCards: data.dateCards
+      // dateCards: data.dateCards
     };
 
     console.log("✅ Fresh profile created with testCompleted:", profile.testCompleted);

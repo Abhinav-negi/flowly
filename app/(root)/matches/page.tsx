@@ -8,14 +8,15 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   getUserProfile,
   setUserInQueue,
-  respondToDate,
 } from "@/lib/services/userService";
+import { getUserDateCards, respondToDateCard } from "@/lib/services/dateCardService";
 import { UserProfile, DateCard } from "@/lib/types/userProfile";
 import PinkCircularLoader from "@/components/PinkCircularLoader";
 
 export default function MatchesPage() {
   const router = useRouter();
-  const [user, setUser] = useState<UserProfile | null>(null);
+const [user, setUser] = useState<UserProfile | null>(null);
+const [dateCards, setDateCards] = useState<DateCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showProfileSummary, setShowProfileSummary] = useState(false);
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
@@ -31,30 +32,32 @@ export default function MatchesPage() {
     setShowDeclineModal(true);
   };
 
-  const refreshUserData = async () => {
-    if (!user) return;
-    const updated = await getUserProfile(user.userId);
-    if (updated) setUser(updated);
-  };
-
-  const submitDecline = async () => {
-    if (!user || !activeCard) return;
-    if (!declineReason.trim()) {
-      alert("Please provide a reason for declining.");
-      return;
-    }
-    await respondToDate(
-      user.userId,
-      activeCard.matchUid,
-      "decline",
-      declineReason.trim()
-    );
-    // Refresh after decline
-    await refreshUserData();
-    setShowDeclineModal(false);
-    setActiveCard(null);
-    setDeclineReason("");
-  };
+const refreshUserData = async () => {
+  if (!user) return;
+  const [updatedUser, updatedCards] = await Promise.all([
+    getUserProfile(user.userId),
+    getUserDateCards(user.userId)
+  ]);
+  if (updatedUser) setUser(updatedUser);
+  setDateCards(updatedCards);
+};
+const submitDecline = async () => {
+  if (!user || !activeCard) return;
+  if (!declineReason.trim()) {
+    alert("Please provide a reason for declining.");
+    return;
+  }
+  await respondToDateCard(
+    activeCard.id,
+    user.userId,
+    "decline",
+    declineReason.trim()
+  );
+  await refreshUserData();
+  setShowDeclineModal(false);
+  setActiveCard(null);
+  setDeclineReason("");
+};
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -75,6 +78,12 @@ export default function MatchesPage() {
 
     return () => unsubscribe();
   }, [router]);
+  // Load date cards when user is set
+useEffect(() => {
+  if (user) {
+    getUserDateCards(user.userId).then(setDateCards);
+  }
+}, [user]);
 
   const getIncompleteFields = (u: UserProfile) => {
     const fields: string[] = [];
@@ -113,12 +122,11 @@ export default function MatchesPage() {
     }
   };
 
-  const handleAccept = async (card: DateCard) => {
-    if (!user) return;
-    await respondToDate(user.userId, card.matchUid, "accept");
-    // Refresh after accept
-    await refreshUserData();
-  };
+const handleAccept = async (card: DateCard) => {
+  if (!user) return;
+  await respondToDateCard(card.id, user.userId, "accept");
+  await refreshUserData();
+};
 
   // Helper function to calculate time until reveal
   const getTimeUntilReveal = (revealAt: number): string => {
@@ -150,8 +158,7 @@ export default function MatchesPage() {
   const incompleteFields = getIncompleteFields(user);
 
   // Filter out expired date cards
-  const activeDateCards = user.dateCards?.filter(card => !isDateExpired(card.time)) || [];
-
+  const activeDateCards = dateCards.filter(card => !isDateExpired(card.time));
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-b from-[#FAF7F5] to-[#ECCFC6] flex flex-col items-center">
       <h1 className="text-3xl font-bold text-center font-secondary mb-6">
@@ -278,123 +285,123 @@ export default function MatchesPage() {
       )}
 
       {/* ===== Existing Date Cards ===== */}
-      {activeDateCards.length > 0 ? (
-        activeDateCards.map((card, idx) => {
-          const youDeclined = card.declined && card.declinedBy === user.userId;
-          const currentTime = Date.now();
-          const isRevealed = card.revealAt ? currentTime >= card.revealAt : false;
+{activeDateCards.length > 0 ? (
+  activeDateCards.map((card, idx) => {
+    const currentTime = Date.now();
+    const isRevealed = card.revealAt ? currentTime >= card.revealAt : false;
 
-          return (
-            <div
-              key={idx}
-              className="bg-white shadow-lg rounded-2xl p-6 mb-4 flex flex-col space-y-4 w-full max-w-md border border-pink-200"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-[#E05265]">
-                  Match Found 🎉
-                </h2>
-                {card.confirmed && (
-                  <span className="text-xs font-semibold bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                    CONFIRMED
-                  </span>
-                )}
+    return (
+      <div
+        key={idx}
+        className="bg-white shadow-lg rounded-2xl p-6 mb-4 flex flex-col space-y-4 w-full max-w-md border border-pink-200"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-[#E05265]">
+            Match Found 🎉
+          </h2>
+          {card.status === "confirmed" && (
+            <span className="text-xs font-semibold bg-green-100 text-green-700 px-3 py-1 rounded-full">
+              CONFIRMED
+            </span>
+          )}
+        </div>
+
+        {/* Date Info */}
+        <div className="grid grid-cols-1 gap-2 text-sm">
+          <p>
+            <strong>Date:</strong> {new Date(card.time).toLocaleString()}
+          </p>
+          <p>
+            <strong>Location:</strong> {card.location}
+          </p>
+          <p>
+            <strong>Description:</strong> {card.description}
+          </p>
+          {card.specialInstructions && (
+            <p>
+              <strong>Instructions:</strong> {card.specialInstructions}
+            </p>
+          )}
+        </div>
+
+        {/* Timer Section for Confirmed Dates (before reveal) */}
+        {card.status === "confirmed" && !isRevealed && card.revealAt && (
+          <div className="bg-gradient-to-r from-[#FF8FA3] to-[#E05265] rounded-xl p-4 text-white">
+            <div className="flex items-center justify-center space-x-3">
+              <Clock className="h-6 w-6 animate-pulse" />
+              <div className="text-center">
+                <p className="font-semibold text-sm">
+                  Your date details will be revealed
+                </p>
+                <p className="text-xs opacity-90">
+                  {getTimeUntilReveal(card.revealAt)}
+                </p>
               </div>
-
-              <div className="grid grid-cols-1 gap-2 text-sm">
-                <p>
-                  <strong>Date:</strong> {new Date(card.time).toLocaleString()}
-                </p>
-                <p>
-                  <strong>Location:</strong> {card.location}
-                </p>
-                <p>
-                  <strong>Description:</strong> {card.description}
-                </p>
-                {card.specialInstructions && (
-                  <p>
-                    <strong>Instructions:</strong> {card.specialInstructions}
-                  </p>
-                )}
-              </div>
-
-              {/* Timer Section for Confirmed Dates (before reveal) */}
-              {card.confirmed && !isRevealed && card.revealAt && (
-                <div className="bg-gradient-to-r from-[#FF8FA3] to-[#E05265] rounded-xl p-4 text-white">
-                  <div className="flex items-center justify-center space-x-3">
-                    <Clock className="h-6 w-6 animate-pulse" />
-                    <div className="text-center">
-                      <p className="font-semibold text-sm">Your date details will be revealed</p>
-                      <p className="text-xs opacity-90">{getTimeUntilReveal(card.revealAt)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Status */}
-              {card.declined ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-700 text-sm">
-                  {youDeclined ? (
-                    <>
-                      <p className="font-semibold">You declined this date.</p>
-                      {card.declineReason && (
-                        <p>Reason: {card.declineReason}</p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <p className="font-semibold">
-                        The other person declined this date.
-                      </p>
-                      {card.declineReason && (
-                        <p>Reason: {card.declineReason}</p>
-                      )}
-                    </>
-                  )}
-                </div>
-              ) : card.confirmed ? (
-                <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-700 text-sm">
-                  ✅ Your date has been confirmed! {isRevealed ? `Meet at ${card.location}` : 'Details will be revealed 10 minutes before your date.'}
-                </div>
-              ) : card.userAccepted ? (
-                <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
-                  Waiting for the other user to accept...
-                </div>
-              ) : card.otherAccepted ? (
-                <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
-                  The other user accepted. Please respond.
-                </div>
-              ) : (
-                <div className="text-gray-500 text-sm">
-                  Please respond to this date.
-                </div>
-              )}
-
-              {/* Actions (hidden if declined or confirmed or already accepted) */}
-              {!card.declined && !card.confirmed && !card.userAccepted && (
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <button
-                    onClick={() => handleAccept(card)}
-                    className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#FF8FA3] to-[#E05265] text-white font-semibold px-6 py-3 shadow-md hover:shadow-lg active:scale-[.98] transition"
-                  >
-                    <CheckCircle className="mr-2 h-5 w-5" />
-                    Accept
-                  </button>
-
-                  <button
-                    onClick={() => openDeclineModal(card)}
-                    className="inline-flex items-center justify-center rounded-xl border-2 border-[#E05265]/40 text-[#E05265] font-semibold px-6 py-3 hover:bg-[#E05265]/5 active:scale-[.98] transition"
-                  >
-                    <XCircle className="mr-2 h-5 w-5" />
-                    Decline
-                  </button>
-                </div>
-              )}
             </div>
-          );
-        })
-      ) : (
-        <p className="text-center text-gray-500">No upcoming dates yet.</p>
-      )}
+          </div>
+        )}
+
+        {/* Status Section (UPDATED) */}
+        {card.status === "cancelled" ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-700 text-sm">
+            <p className="font-semibold">This date was cancelled.</p>
+            {card.responses[user.userId]?.declineReason && (
+              <p>Reason: {card.responses[user.userId].declineReason}</p>
+            )}
+          </div>
+        ) : card.status === "confirmed" ? (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-700 text-sm">
+            ✅ Your date has been confirmed!{" "}
+            {isRevealed
+              ? `Meet at ${card.location}`
+              : "Details will be revealed 10 minutes before your date."}
+          </div>
+        ) : card.responses[user.userId]?.status === "accepted" ? (
+          <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
+            Waiting for the other user to accept...
+          </div>
+        ) : Object.values(card.responses).some(
+            (r) => r.status === "accepted"
+          ) ? (
+          <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
+            The other user accepted. Please respond.
+          </div>
+        ) : (
+          <div className="text-gray-500 text-sm">
+            Please respond to this date.
+          </div>
+        )}
+
+        {/* Actions (only show if not cancelled/confirmed/accepted) */}
+        {card.status !== "cancelled" &&
+          card.status !== "confirmed" &&
+          card.responses[user.userId]?.status !== "accepted" && (
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <button
+                onClick={() => handleAccept(card)}
+                className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#FF8FA3] to-[#E05265] text-white font-semibold px-6 py-3 shadow-md hover:shadow-lg active:scale-[.98] transition"
+              >
+                <CheckCircle className="mr-2 h-5 w-5" />
+                Accept
+              </button>
+
+              <button
+                onClick={() => openDeclineModal(card)}
+                className="inline-flex items-center justify-center rounded-xl border-2 border-[#E05265]/40 text-[#E05265] font-semibold px-6 py-3 hover:bg-[#E05265]/5 active:scale-[.98] transition"
+              >
+                <XCircle className="mr-2 h-5 w-5" />
+                Decline
+              </button>
+            </div>
+          )}
+      </div>
+    );
+  })
+) : (
+  <p className="text-center text-gray-500">No upcoming dates yet.</p>
+)}
+
 
       {/* Decline Reason Modal */}
       {showDeclineModal && (
