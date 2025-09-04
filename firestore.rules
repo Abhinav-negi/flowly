@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ✅ Admin check
+    // -- Helpers
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.admin == true ||
@@ -10,132 +10,87 @@ service cloud.firestore {
       );
     }
 
-    function isUserVerified(userData) {
-      return userData.verification != null && 
-             userData.verification.verificationStatus == 'verified';
-    }
-
-    function isCurrentUserVerified() {
-      return request.auth != null && 
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             isUserVerified(get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
-    }
-
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // 🔒 Admins collection
-    match /admins/{adminId} {
-      allow read: if request.auth != null;
-      allow write: if isAdmin();
-    }
-
-    // 👤 Users
+    // -- Users
     match /users/{userId} {
-      // ✅ Owners can always create/update their own profile
-      allow create, update, delete: if isOwner(userId);
-      allow read: if isOwner(userId);
-
-      // ✅ Admin override
-      allow read, write: if isAdmin();
-
-      // ✅ Verified users can read other verified users
-      allow read: if resource != null &&
-                  isCurrentUserVerified() &&
-                  isUserVerified(resource.data);
+      allow read, write: if isOwner(userId) || isAdmin();
 
       match /notifications/{notificationId} {
-        allow read, write: if isOwner(userId);
-        allow write: if isAdmin();
+        allow read, write: if isOwner(userId) || isAdmin();
       }
     }
 
-    // Matches
+    // -- Matches
     match /matches/{matchId} {
-      allow read: if request.auth != null &&
-                  resource != null &&
-                  (resource.data.users[0] == request.auth.uid || 
-                   resource.data.users[1] == request.auth.uid);
-
-      allow update: if request.auth != null &&
-                    resource != null &&
-                    (resource.data.users[0] == request.auth.uid || 
-                     resource.data.users[1] == request.auth.uid) &&
-                    request.resource.data.diff(resource.data).affectedKeys()
-                      .hasOnly(['user1Accepted','user2Accepted','status']);
-
-      allow read, write: if isAdmin();
-    }
-
-    // Dates
-    match /dates/{dateId} {
-      allow read, write: if request.auth != null &&
+      allow read, write: if isAdmin() ||
+                         (request.auth != null &&
                          resource != null &&
-                         (resource.data.users[0] == request.auth.uid || 
-                          resource.data.users[1] == request.auth.uid);
-
-      allow read, write: if isAdmin();
+                         (resource.data.users[0] == request.auth.uid ||
+                          resource.data.users[1] == request.auth.uid));
     }
 
-    // Messages
+    // -- Dates
+    match /dates/{dateId} {
+      allow read, write: if isAdmin() ||
+                         (request.auth != null &&
+                          resource != null &&
+                         (resource.data.users[0] == request.auth.uid ||
+                          resource.data.users[1] == request.auth.uid));
+    }
+
+    // -- Messages
     match /messages/{messageId} {
-      allow read: if request.auth != null &&
-                  resource != null &&
-                  (resource.data.fromUid == request.auth.uid || 
-                   resource.data.toUid == request.auth.uid);
+      allow read: if isAdmin() ||
+                  (request.auth != null &&
+                   resource != null &&
+                   (resource.data.fromUid == request.auth.uid ||
+                    resource.data.toUid == request.auth.uid));
 
-      allow create: if request.auth != null &&
-                    request.resource.data.fromUid == request.auth.uid;
+      allow create: if isAdmin() ||
+                    (request.auth != null &&
+                     request.resource.data.fromUid == request.auth.uid);
 
-      allow update: if request.auth != null &&
-                    resource != null &&
-                    resource.data.toUid == request.auth.uid &&
-                    request.resource.data.diff(resource.data).affectedKeys()
-                      .hasOnly(['read']);
-
-      allow read, write: if isAdmin();
+      allow update: if isAdmin() ||
+                    (request.auth != null &&
+                     resource != null &&
+                     resource.data.toUid == request.auth.uid &&
+                     request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['read']));
     }
 
-    // Reports
+    // -- Reports
     match /reports/{reportId} {
       allow create: if request.auth != null &&
                     request.resource.data.reporterId == request.auth.uid;
 
-      allow read: if request.auth != null &&
-                  resource != null &&
-                  resource.data.reporterId == request.auth.uid;
-
-      allow read, write: if isAdmin();
+      allow read, write: if isAdmin() ||
+                         (request.auth != null &&
+                          resource != null &&
+                          resource.data.reporterId == request.auth.uid);
     }
 
-    // Analytics
+    // -- Admin-only collections
+    match /admins/{docId} {
+      allow read, write: if isAdmin();
+    }
     match /analytics/{docId} {
       allow read, write: if isAdmin();
     }
-
-    // Settings
-    match /settings/{settingId} {
+    match /settings/{docId} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
-
-    // Verifications
-    match /verifications/{userId} {
-      allow read, write: if isOwner(userId);
-      allow read, write: if isAdmin();
+    match /verifications/{docId} {
+      allow read, write: if isOwner(docId) || isAdmin();
+    }
+    match /queue/{docId} {
+      allow read, write: if isOwner(docId) || isAdmin();
     }
 
-    // Queue
-    match /queue/{userId} {
-      allow read: if isOwner(userId);
-      allow update: if isOwner(userId) &&
-                    request.resource.data.diff(resource.data).affectedKeys()
-                      .hasOnly(['active','preferences']);
-      allow read, write: if isAdmin();
-    }
-
-    // ✅ Global Admin override (applied early)
+    // -- Global fallback for admins
     match /{document=**} {
       allow read, write: if isAdmin();
     }
