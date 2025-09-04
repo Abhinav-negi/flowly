@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
@@ -18,7 +18,6 @@ export default function MatchesPage() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showProfileSummary, setShowProfileSummary] = useState(false);
-
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
 
   // Decline reason state
@@ -30,6 +29,12 @@ export default function MatchesPage() {
     setActiveCard(card);
     setDeclineReason("");
     setShowDeclineModal(true);
+  };
+
+  const refreshUserData = async () => {
+    if (!user) return;
+    const updated = await getUserProfile(user.userId);
+    if (updated) setUser(updated);
   };
 
   const submitDecline = async () => {
@@ -44,8 +49,8 @@ export default function MatchesPage() {
       "decline",
       declineReason.trim()
     );
-    const updated = await getUserProfile(user.userId);
-    if (updated) setUser(updated);
+    // Refresh after decline
+    await refreshUserData();
     setShowDeclineModal(false);
     setActiveCard(null);
     setDeclineReason("");
@@ -111,14 +116,41 @@ export default function MatchesPage() {
   const handleAccept = async (card: DateCard) => {
     if (!user) return;
     await respondToDate(user.userId, card.matchUid, "accept");
-    const updatedProfile = await getUserProfile(user.userId);
-    if (updatedProfile) setUser(updatedProfile);
+    // Refresh after accept
+    await refreshUserData();
+  };
+
+  // Helper function to calculate time until reveal
+  const getTimeUntilReveal = (revealAt: number): string => {
+    const now = Date.now();
+    const timeLeft = revealAt - now;
+    
+    if (timeLeft <= 0) return "Details revealed!";
+    
+    const hours = Math.floor(timeLeft / (1000 * 60 * 60));
+    const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m until reveal`;
+    }
+    return `${minutes}m until reveal`;
+  };
+
+  // Helper function to check if date card should be deleted (after midnight of date day)
+  const isDateExpired = (dateTime: string): boolean => {
+    const dateObj = new Date(dateTime);
+    const endOfDateDay = new Date(dateObj);
+    endOfDateDay.setHours(23, 59, 59, 999);
+    return Date.now() > endOfDateDay.getTime();
   };
 
   if (loading) return <p className="text-center mt-10">Loading...</p>;
   if (!user) return <p className="text-center mt-10">User not found.</p>;
 
   const incompleteFields = getIncompleteFields(user);
+
+  // Filter out expired date cards
+  const activeDateCards = user.dateCards?.filter(card => !isDateExpired(card.time)) || [];
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-b from-[#FAF7F5] to-[#ECCFC6] flex flex-col items-center">
@@ -188,15 +220,15 @@ export default function MatchesPage() {
               </p>
             )}
 
-            <div className="flex justify-between mt-4">
+            <div className="flex justify-between gap-3 mt-4">
               <button
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                className="px-4 py-2 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors"
                 onClick={() => router.push("/profile")}
               >
                 Edit Profile
               </button>
               <button
-                className="px-4 py-2 bg-[#E05265] text-white rounded hover:bg-[#C04255]"
+                className="px-4 py-2 bg-[#E05265] text-white rounded-lg hover:bg-[#C04255] transition-colors"
                 onClick={confirmJoinQueue}
               >
                 Confirm & Join Queue
@@ -207,7 +239,7 @@ export default function MatchesPage() {
       )}
 
       {/* Queue Loader (only if no cards) */}
-      {user.inQueue && (!user.dateCards || user.dateCards.length === 0) && (
+      {user.inQueue && activeDateCards.length === 0 && (
         <section className="bg-white shadow rounded-xl p-6 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
           <h2 className="text-xl font-semibold text-[#E05265]">
             We&apos;re finding your perfect match
@@ -229,7 +261,7 @@ export default function MatchesPage() {
 
       {/* Join Queue Button */}
       {!user.inQueue && (
-        <section className="bg-white shadow rounded-xl p-6 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
+        <section className="bg-white shadow rounded-xl p-8 mb-6 flex flex-col items-center space-y-4 w-full max-w-md">
           <h2 className="text-xl font-semibold font-secondary text-[#E05265]">
             Find Your Perfect Match
           </h2>
@@ -238,7 +270,7 @@ export default function MatchesPage() {
           </p>
           <button
             onClick={handleJoinQueue}
-            className="px-6 py-2 bg-[#E05265] text-white rounded hover:bg-[#C04255]"
+            className="px-8 py-3 bg-[#E05265] text-white rounded-xl hover:bg-[#C04255] transition-colors font-semibold shadow-md"
           >
             Join Queue
           </button>
@@ -246,32 +278,31 @@ export default function MatchesPage() {
       )}
 
       {/* ===== Existing Date Cards ===== */}
-      {user.dateCards && user.dateCards.length > 0 ? (
-        user.dateCards.map((card, idx) => {
+      {activeDateCards.length > 0 ? (
+        activeDateCards.map((card, idx) => {
           const youDeclined = card.declined && card.declinedBy === user.userId;
+          const currentTime = Date.now();
+          const isRevealed = card.revealAt ? currentTime >= card.revealAt : false;
 
           return (
             <div
               key={idx}
-              className="bg-white shadow-lg rounded-2xl p-6 mb-4 flex flex-col space-y-3 w-full max-w-md border border-pink-200"
+              className="bg-white shadow-lg rounded-2xl p-6 mb-4 flex flex-col space-y-4 w-full max-w-md border border-pink-200"
             >
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold text-[#E05265]">
                   Match Found 🎉
                 </h2>
                 {card.confirmed && (
-                  <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded">
+                  <span className="text-xs font-semibold bg-green-100 text-green-700 px-3 py-1 rounded-full">
                     CONFIRMED
                   </span>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-1 text-sm">
+              <div className="grid grid-cols-1 gap-2 text-sm">
                 <p>
-                  <strong>Match ID:</strong> {card.matchUid}
-                </p>
-                <p>
-                  <strong>Date:</strong> {card.time}
+                  <strong>Date:</strong> {new Date(card.time).toLocaleString()}
                 </p>
                 <p>
                   <strong>Location:</strong> {card.location}
@@ -285,6 +316,19 @@ export default function MatchesPage() {
                   </p>
                 )}
               </div>
+
+              {/* Timer Section for Confirmed Dates (before reveal) */}
+              {card.confirmed && !isRevealed && card.revealAt && (
+                <div className="bg-gradient-to-r from-[#FF8FA3] to-[#E05265] rounded-xl p-4 text-white">
+                  <div className="flex items-center justify-center space-x-3">
+                    <Clock className="h-6 w-6 animate-pulse" />
+                    <div className="text-center">
+                      <p className="font-semibold text-sm">Your date details will be revealed</p>
+                      <p className="text-xs opacity-90">{getTimeUntilReveal(card.revealAt)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Status */}
               {card.declined ? (
@@ -309,7 +353,7 @@ export default function MatchesPage() {
                 </div>
               ) : card.confirmed ? (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-700 text-sm">
-                  ✅ Date Confirmed! Meet at <strong>{card.location}</strong>
+                  ✅ Your date has been confirmed! {isRevealed ? `Meet at ${card.location}` : 'Details will be revealed 10 minutes before your date.'}
                 </div>
               ) : card.userAccepted ? (
                 <div className="rounded-lg border border-[#ECCFC6] bg-[#FAF7F5] p-3 text-[#e1ab9b] text-sm">
@@ -327,10 +371,10 @@ export default function MatchesPage() {
 
               {/* Actions (hidden if declined or confirmed or already accepted) */}
               {!card.declined && !card.confirmed && !card.userAccepted && (
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-2 gap-4 pt-2">
                   <button
                     onClick={() => handleAccept(card)}
-                    className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#FF8FA3] to-[#E05265] text-white font-semibold px-5 py-2 shadow-md hover:shadow-lg active:scale-[.98] transition"
+                    className="group inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-[#FF8FA3] to-[#E05265] text-white font-semibold px-6 py-3 shadow-md hover:shadow-lg active:scale-[.98] transition"
                   >
                     <CheckCircle className="mr-2 h-5 w-5" />
                     Accept
@@ -338,10 +382,10 @@ export default function MatchesPage() {
 
                   <button
                     onClick={() => openDeclineModal(card)}
-                    className="inline-flex items-center justify-center rounded-xl border-2 border-[#E05265]/40 text-[#E05265] font-semibold px-5 py-2 hover:bg-[#E05265]/5 active:scale-[.98] transition"
+                    className="inline-flex items-center justify-center rounded-xl border-2 border-[#E05265]/40 text-[#E05265] font-semibold px-6 py-3 hover:bg-[#E05265]/5 active:scale-[.98] transition"
                   >
                     <XCircle className="mr-2 h-5 w-5" />
-                    Reject
+                    Decline
                   </button>
                 </div>
               )}
@@ -357,7 +401,7 @@ export default function MatchesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="text-lg font-semibold text-[#E05265] text-center">
-              Why are you rejecting this date?
+              Why are you declining this date?
             </h3>
             <p className="mt-2 text-sm text-gray-600 text-center">
               Please share a short reason. This helps us improve your future
@@ -367,7 +411,7 @@ export default function MatchesPage() {
             <textarea
               className="mt-4 w-full rounded-lg border p-3 text-sm outline-none focus:ring-2 focus:ring-[#E05265]/40"
               rows={4}
-              placeholder="e.g., timing doesn’t work, not my vibe, location too far…"
+              placeholder="e.g., timing doesn't work, not my vibe, location too far…"
               value={declineReason}
               onChange={(e) => setDeclineReason(e.target.value)}
             />
@@ -379,13 +423,13 @@ export default function MatchesPage() {
                   setActiveCard(null);
                   setDeclineReason("");
                 }}
-                className="rounded-xl border border-gray-300 bg-white px-5 py-2 font-semibold hover:bg-gray-50"
+                className="rounded-xl border border-gray-300 bg-white px-5 py-2 font-semibold hover:bg-gray-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={submitDecline}
-                className="rounded-xl bg-red-500 px-5 py-2 font-semibold text-white hover:bg-red-600"
+                className="rounded-xl bg-red-500 px-5 py-2 font-semibold text-white hover:bg-red-600 transition-colors"
               >
                 Submit Decline
               </button>

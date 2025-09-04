@@ -29,11 +29,11 @@ interface FormState {
   maxAge: number;
   heightUnit: "cm" | "ft";
   height: number; // cm OR feet(.0/.5)
-  // optional lifestyle
-  workout?: Workout | "";
-  drinking?: Drinking | "";
-  smoking?: Smoking | "";
-  education?: Education | "";
+  // now required lifestyle
+  workout: Workout | "";
+  drinking: Drinking | "";
+  smoking: Smoking | "";
+  education: Education | "";
 }
 
 const Welcome = ({ onStart }: { onStart: () => void }) => (
@@ -96,10 +96,10 @@ export default function OnboardingFlow({ onSubmit }: Props) {
       "distance",
       "ageRange",
       "height",
-      "workout(optional)",
-      "drinking(optional)",
-      "smoking(optional)",
-      "education(optional)",
+      "workout",
+      "drinking",
+      "smoking",
+      "education",
       "review",
     ],
     []
@@ -111,7 +111,11 @@ export default function OnboardingFlow({ onSubmit }: Props) {
       !!form.gender &&
       !!form.interestedIn &&
       !!form.lookingFor &&
-      !!form.religion
+      !!form.religion &&
+      !!form.workout &&
+      !!form.drinking &&
+      !!form.smoking &&
+      !!form.education
     );
   }, [form]);
 
@@ -132,10 +136,10 @@ export default function OnboardingFlow({ onSubmit }: Props) {
       minAge: form.minAge,
       maxAge: form.maxAge,
       heightString: toHeightString(),
-      workout: form.workout || undefined,
-      drinking: form.drinking || undefined,
-      smoking: form.smoking || undefined,
-      education: form.education || undefined,
+      workout: form.workout as Workout,
+      drinking: form.drinking as Drinking,
+      smoking: form.smoking as Smoking,
+      education: form.education as Education,
     };
     onSubmit(payload);
   };
@@ -150,9 +154,7 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     onNext?: () => void;
     onBack?: () => void;
     nextLabel?: string;
-    showSkip?: boolean;
-    onSkip?: () => void;
-  }> = ({ children, canNext = true, onNext, onBack, nextLabel = "Next", showSkip, onSkip }) => (
+  }> = ({ children, canNext = true, onNext, onBack, nextLabel = "Next" }) => (
     <div className="min-h-screen w-full flex items-center justify-center p-4" style={{ background: "linear-gradient(to bottom, #FAF7F5, #E05265)" }}>
       <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-6 md:p-8 w-full max-w-lg shadow-2xl min-h-[560px] md:min-h-[620px] flex flex-col">
         <div className="flex-0">
@@ -174,11 +176,6 @@ export default function OnboardingFlow({ onSubmit }: Props) {
           >
             Back
           </Button>
-          {showSkip && (
-            <Button onClick={onSkip} variant="outline" className="flex-1">
-              Skip
-            </Button>
-          )}
           <Button
             onClick={onNext}
             disabled={!canNext}
@@ -312,13 +309,39 @@ export default function OnboardingFlow({ onSubmit }: Props) {
         <div className="text-center">
           <h2 className="font-secondary text-2xl text-[#E05265] mb-8">How far can your matches be?</h2>
           <div className="max-w-sm mx-auto">
+            <style jsx>{`
+              .slider {
+                -webkit-appearance: none;
+                appearance: none;
+                height: 8px;
+                border-radius: 4px;
+                outline: none;
+              }
+              .slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #E05265;
+                cursor: pointer;
+              }
+              .slider::-moz-range-thumb {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #E05265;
+                cursor: pointer;
+                border: none;
+              }
+            `}</style>
             <input
               type="range"
               min={1}
               max={150}
               value={form.distancePreference}
               onChange={(e) => setField("distancePreference", parseInt(e.target.value, 10))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+              className="slider w-full"
               style={{
                 background: `linear-gradient(to right, #E05265 0%, #E05265 ${((form.distancePreference - 1) / (150 - 1)) * 100}%, #e5e7eb ${((form.distancePreference - 1) / (150 - 1)) * 100}%, #e5e7eb 100%)`
               }}
@@ -337,6 +360,32 @@ export default function OnboardingFlow({ onSubmit }: Props) {
         <div className="text-center">
           <h2 className="font-secondary text-2xl text-[#E05265] mb-8">Preferred age range</h2>
           <div className="max-w-sm mx-auto space-y-6">
+            <style jsx>{`
+              .age-slider {
+                -webkit-appearance: none;
+                appearance: none;
+                height: 8px;
+                border-radius: 4px;
+                outline: none;
+              }
+              .age-slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #E05265;
+                cursor: pointer;
+              }
+              .age-slider::-moz-range-thumb {
+                width: 20px;
+                height: 20px;
+                border-radius: 50%;
+                background: #E05265;
+                cursor: pointer;
+                border: none;
+              }
+            `}</style>
             <div>
               <label className="text-sm font-medium text-[#7C706A] block mb-2">Min Age</label>
               <input
@@ -349,7 +398,7 @@ export default function OnboardingFlow({ onSubmit }: Props) {
                   setField("minAge", v);
                   if (form.maxAge < v) setField("maxAge", v);
                 }}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                className="age-slider w-full"
                 style={{
                   background: `linear-gradient(to right, #E05265 0%, #E05265 ${((form.minAge - 18) / (50 - 18)) * 100}%, #e5e7eb ${((form.minAge - 18) / (50 - 18)) * 100}%, #e5e7eb 100%)`
                 }}
@@ -368,7 +417,7 @@ export default function OnboardingFlow({ onSubmit }: Props) {
                   setField("maxAge", v);
                   if (form.minAge > v) setField("minAge", v);
                 }}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                className="age-slider w-full"
                 style={{
                   background: `linear-gradient(to right, #E05265 0%, #E05265 ${((form.maxAge - 18) / (50 - 18)) * 100}%, #e5e7eb ${((form.maxAge - 18) / (50 - 18)) * 100}%, #e5e7eb 100%)`
                 }}
@@ -433,8 +482,8 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     );
   }
 
-  // helper for optional cards
-  const optionalCard = (title: string, options: string[], value: string, setValue: (v: string) => void) => (
+  // helper for required cards
+  const requiredCard = (title: string, options: string[], value: string, setValue: (v: string) => void) => (
     <div className="text-center">
       <h2 className="font-secondary text-2xl text-[#E05265] mb-8">{title}</h2>
       <div className="flex gap-3 flex-wrap justify-center max-w-sm mx-auto">
@@ -451,20 +500,12 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     </div>
   );
 
-  // WORKOUT (optional)
-  if (stepKey === "workout(optional)") {
+  // WORKOUT
+  if (stepKey === "workout") {
     return (
-      <Shell
-        canNext
-        onNext={() => setStep(step + 1)}
-        showSkip
-        onSkip={() => {
-          setField("workout", "");
-          setStep(step + 1);
-        }}
-      >
-        {optionalCard(
-          "How often do you work out? (optional)",
+      <Shell canNext={!!form.workout} onNext={() => setStep(step + 1)}>
+        {requiredCard(
+          "How often do you work out?",
           ["regularly", "sometimes", "never"],
           form.workout || "",
           (v) => setField("workout", v as Workout)
@@ -473,20 +514,12 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     );
   }
 
-  // DRINKING (optional)
-  if (stepKey === "drinking(optional)") {
+  // DRINKING
+  if (stepKey === "drinking") {
     return (
-      <Shell
-        canNext
-        onNext={() => setStep(step + 1)}
-        showSkip
-        onSkip={() => {
-          setField("drinking", "");
-          setStep(step + 1);
-        }}
-      >
-        {optionalCard(
-          "Do you drink? (optional)",
+      <Shell canNext={!!form.drinking} onNext={() => setStep(step + 1)}>
+        {requiredCard(
+          "Do you drink?",
           ["yes", "socially", "no"],
           form.drinking || "",
           (v) => setField("drinking", v as Drinking)
@@ -495,20 +528,12 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     );
   }
 
-  // SMOKING (optional)
-  if (stepKey === "smoking(optional)") {
+  // SMOKING
+  if (stepKey === "smoking") {
     return (
-      <Shell
-        canNext
-        onNext={() => setStep(step + 1)}
-        showSkip
-        onSkip={() => {
-          setField("smoking", "");
-          setStep(step + 1);
-        }}
-      >
-        {optionalCard(
-          "Do you smoke? (optional)",
+      <Shell canNext={!!form.smoking} onNext={() => setStep(step + 1)}>
+        {requiredCard(
+          "Do you smoke?",
           ["yes", "sometimes", "no"],
           form.smoking || "",
           (v) => setField("smoking", v as Smoking)
@@ -517,20 +542,12 @@ export default function OnboardingFlow({ onSubmit }: Props) {
     );
   }
 
-  // EDUCATION (optional)
-  if (stepKey === "education(optional)") {
+  // EDUCATION
+  if (stepKey === "education") {
     return (
-      <Shell
-        canNext
-        onNext={() => setStep(step + 1)}
-        showSkip
-        onSkip={() => {
-          setField("education", "");
-          setStep(step + 1);
-        }}
-      >
-        {optionalCard(
-          "Your education (optional)",
+      <Shell canNext={!!form.education} onNext={() => setStep(step + 1)}>
+        {requiredCard(
+          "Your education",
           ["high_school", "in_college", "bachelors", "masters", "phd","posgraduation","undergraduation"],
           form.education || "",
           (v) => setField("education", v as Education)
@@ -560,10 +577,10 @@ export default function OnboardingFlow({ onSubmit }: Props) {
             <p><b>Distance:</b> {form.distancePreference} km</p>
             <p><b>Age range:</b> {form.minAge}-{form.maxAge}</p>
             <p><b>Height:</b> {form.heightUnit === "cm" ? `${form.height} cm` : `${Math.floor(form.height)}'${form.height % 1 === 0.5 ? "6" : "0"}`}</p>
-            {!!form.workout && <p><b>Workout:</b> {form.workout}</p>}
-            {!!form.drinking && <p><b>Drinking:</b> {form.drinking}</p>}
-            {!!form.smoking && <p><b>Smoking:</b> {form.smoking}</p>}
-            {!!form.education && <p><b>Education:</b> {form.education}</p>}
+            <p><b>Workout:</b> {form.workout}</p>
+            <p><b>Drinking:</b> {form.drinking}</p>
+            <p><b>Smoking:</b> {form.smoking}</p>
+            <p><b>Education:</b> {form.education}</p>
           </div>
         </div>
 
@@ -578,7 +595,7 @@ export default function OnboardingFlow({ onSubmit }: Props) {
 
           {!requiredValid && (
             <p className="text-xs text-red-500 mt-3">
-              Please fill the required details (Name, Gender, Interested In, Looking For, Religion).
+              Please fill all the required details.
             </p>
           )}
         </div>

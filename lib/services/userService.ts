@@ -184,7 +184,7 @@ export async function addMatch(uid: string, otherUid: string) {
 }
 
 /**
- * Date card helpers
+ * Date card helpers - Updated to handle date expiry at midnight
  */
 export async function getUserWithDates(uid: string): Promise<{
   uid: string;
@@ -197,12 +197,16 @@ export async function getUserWithDates(uid: string): Promise<{
   const data = snap.data() as DocumentData;
 
   const currentTime = Date.now();
+  
+  // Filter out expired date cards (after midnight of date day)
   const dateCards: DateCard[] = Array.isArray(data.dateCards)
     ? data.dateCards
-        .filter(
-          (card: DateCard) =>
-            new Date(card.time).getTime() > currentTime - 2 * 60 * 60 * 1000
-        )
+        .filter((card: DateCard) => {
+          const dateObj = new Date(card.time);
+          const endOfDateDay = new Date(dateObj);
+          endOfDateDay.setHours(23, 59, 59, 999);
+          return currentTime <= endOfDateDay.getTime();
+        })
         .map((card: DateCard) => ({
           ...card,
           isRevealed: currentTime >= (card.revealAt || 0),
@@ -273,14 +277,14 @@ export async function createDateCard(
     title: "Date Scheduled!",
     body: "You have a date scheduled. Details will be revealed 10 minutes before the date time.",
     type: "date_scheduled",
-    anchor: "/dates",
+    anchor: "/matches",
   });
 
   await sendNotification(matchUid, {
     title: "Date Scheduled!",
     body: "You have a date scheduled. Details will be revealed 10 minutes before the date time.",
     type: "date_scheduled",
-    anchor: "/dates",
+    anchor: "/matches",
   });
 
   return dateCard;
@@ -308,7 +312,7 @@ function scheduleDateRevealNotification(
           dateTime
         ).toLocaleTimeString()}.`,
         type: "date_reveal",
-        anchor: "/dates",
+        anchor: "/matches",
       });
 
       await sendNotification(matchUid, {
@@ -317,7 +321,7 @@ function scheduleDateRevealNotification(
           dateTime
         ).toLocaleTimeString()}.`,
         type: "date_reveal",
-        anchor: "/dates",
+        anchor: "/matches",
       });
     }, timeUntilReveal);
   }
@@ -367,15 +371,15 @@ export async function updateDateCard(
   if (updates.confirmed) {
     await sendNotification(uid, {
       title: "Date Confirmed!",
-      body: `Your date with ${matchUid} is confirmed.`,
-      type: "date",
-      anchor: "/dates",
+      body: `Your date has been confirmed!`,
+      type: "date_confirmed",
+      anchor: "/matches",
     });
     await sendNotification(matchUid, {
       title: "Date Confirmed!",
-      body: `Your date with ${uid} is confirmed.`,
-      type: "date",
-      anchor: "/dates",
+      body: `Your date has been confirmed!`,
+      type: "date_confirmed",
+      anchor: "/matches",
     });
   }
 }
@@ -458,17 +462,19 @@ export async function updateVerificationStatus(
 }
 
 /**
- * Clean up old dates
+ * Clean up old dates - removes expired date cards (after midnight of date day)
  */
 export async function cleanupOldDates(uid: string) {
   const userObj = await getUserWithDates(uid);
   if (!userObj) return;
 
   const currentTime = Date.now();
-  const activeDateCards = userObj.dateCards.filter(
-    (card) =>
-      new Date(card.time).getTime() > currentTime - 2 * 60 * 60 * 1000
-  );
+  const activeDateCards = userObj.dateCards.filter((card) => {
+    const dateObj = new Date(card.time);
+    const endOfDateDay = new Date(dateObj);
+    endOfDateDay.setHours(23, 59, 59, 999);
+    return currentTime <= endOfDateDay.getTime();
+  });
 
   if (activeDateCards.length < userObj.dateCards.length) {
     await updateDoc(getUserDocRef(uid), {
@@ -479,7 +485,7 @@ export async function cleanupOldDates(uid: string) {
 }
 
 /**
- * Respond to a date (accept or decline) ✅ fixed version
+ * Respond to a date (accept or decline) - Updated with proper decline handling and confirmation logic
  */
 export const respondToDate = async (
   userId: string,
@@ -488,37 +494,100 @@ export const respondToDate = async (
   reason?: string
 ) => {
   const userRef = doc(db, "users", userId);
+  const matchRef = doc(db, "users", matchUid);
+  
   const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) return;
+  const matchSnap = await getDoc(matchRef);
+  
+  if (!userSnap.exists() || !matchSnap.exists()) return;
 
   const userData = userSnap.data() as UserProfile;
+  const matchData = matchSnap.data() as UserProfile;
 
-  const updatedCards = userData.dateCards?.map((card) => {
+  // Update current user's date cards
+  const updatedUserCards = userData.dateCards?.map((card) => {
     if (card.matchUid === matchUid) {
       if (response === "accept") {
         card.userAccepted = true;
-        card.declineReason = null; // clear any past rejection
+        card.declined = false;
+        card.declinedBy = undefined;
+        card.declineReason = null;
+        // Check if both accepted to confirm
+        card.confirmed = card.otherAccepted === true;
       } else if (response === "decline") {
         card.userAccepted = false;
+        card.declined = true;
+        card.declinedBy = userId;
         card.declineReason = reason || "No reason provided";
+        card.declinedAt = Date.now();
+        card.confirmed = false;
       }
-      card.confirmed = card.userAccepted && card.otherAccepted ? true : false;
     }
     return card;
   });
 
-  await updateDoc(userRef, { dateCards: updatedCards, updatedAt: serverTimestamp() });
-
-  // Notify other user
-  await sendNotification(matchUid, {
-    title: response === "accept" ? "Date Accepted" : "Date Declined",
-    body:
-      response === "accept"
-        ? `${userData.name || "Your match"} accepted the date.`
-        : `${userData.name || "Your match"} declined the date${
-            reason ? `: "${reason}"` : "."
-          }`,
-    type: response === "accept" ? "date_accept" : "date_decline",
-    anchor: "/dates",
+  // Update match user's date cards
+  const updatedMatchCards = matchData.dateCards?.map((card) => {
+    if (card.matchUid === userId) {
+      if (response === "accept") {
+        card.otherAccepted = true;
+        card.declined = false;
+        card.declinedBy = undefined;
+        card.declineReason = null;
+        // Check if both accepted to confirm
+        card.confirmed = card.userAccepted === true;
+      } else if (response === "decline") {
+        card.declined = true;
+        card.declinedBy = userId;
+        card.declineReason = reason || "No reason provided";
+        card.declinedAt = Date.now();
+        card.confirmed = false;
+      }
+    }
+    return card;
   });
+
+  // Update both users' documents
+  await updateDoc(userRef, { 
+    dateCards: updatedUserCards, 
+    updatedAt: serverTimestamp() 
+  });
+  
+  await updateDoc(matchRef, { 
+    dateCards: updatedMatchCards, 
+    updatedAt: serverTimestamp() 
+  });
+
+  // Send notifications
+  if (response === "accept") {
+    const isConfirmed = updatedUserCards?.find(c => c.matchUid === matchUid)?.confirmed;
+    
+    await sendNotification(matchUid, {
+      title: isConfirmed ? "Date Confirmed!" : "Date Accepted",
+      body: isConfirmed 
+        ? "Your date has been confirmed! Details will be revealed 10 minutes before your date."
+        : `${userData.name || "Your match"} accepted the date.`,
+      type: isConfirmed ? "date_confirmed" : "date_accept",
+      anchor: "/matches",
+    });
+
+    // If confirmed, also notify the current user
+    if (isConfirmed) {
+      await sendNotification(userId, {
+        title: "Date Confirmed!",
+        body: "Your date has been confirmed! Details will be revealed 10 minutes before your date.",
+        type: "date_confirmed",
+        anchor: "/matches",
+      });
+    }
+  } else if (response === "decline") {
+    await sendNotification(matchUid, {
+      title: "Date Declined",
+      body: `${userData.name || "Your match"} declined the date${
+        reason ? `: "${reason}"` : "."
+      }`,
+      type: "date_decline",
+      anchor: "/matches",
+    });
+  }
 };

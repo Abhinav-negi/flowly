@@ -11,7 +11,6 @@ export interface Verification {
   photoVerified: boolean;
   idVerified: boolean;
   verificationStatus: VerificationStatus;
-
   idDocUrl?: string;
   livePhotoUrl?: string;
 }
@@ -25,7 +24,6 @@ export interface DateCard {
   matchUid: string;
   time: string; // e.g., ISO string
   location: string;
-
   description: string;
   specialInstructions?: string;
   userAccepted?: boolean;
@@ -40,12 +38,11 @@ export interface DateCard {
   createdAt?: number;
   isRevealed: boolean;
 
-  // 👇 NEW: record declines cleanly
+  // ✅ Updated decline handling
   declined?: boolean;
   declinedBy?: string; // uid of the person who declined
   declineReason?: string | null; // reason text
   declinedAt?: number; // timestamp
-  //  rejectionReason?: string; // ✅ new optional field
 }
 
 export interface Message {
@@ -96,8 +93,7 @@ export interface UserProfile {
   createdAt?: number;
   updatedAt?: number;
 
-
-    // ✅ Personality Test Fields
+  // ✅ Personality Test Fields
   testCompleted?: boolean;
   personalityType?: string | null;
   scores?: {
@@ -110,8 +106,8 @@ export interface UserProfile {
   } | null;
   completedAt?: number;
   skippedAt?: number;
-  
-    // ✅ New Preferences & Lifestyle fields
+
+  // ✅ New Preferences & Lifestyle fields
   preferences?: {
     interestedIn: "men" | "women" | "everyone";
     distancePreference: number; // in km
@@ -119,7 +115,14 @@ export interface UserProfile {
       workout?: "regularly" | "sometimes" | "never";
       drinking?: "yes" | "socially" | "no";
       smoking?: "yes" | "sometimes" | "no";
-      education?: "high_school" | "in_college" | "bachelors" | "masters" | "phd" |"posgraduation" |"undergraduation";
+      education?:
+        | "high_school"
+        | "in_college"
+        | "bachelors"
+        | "masters"
+        | "phd"
+        | "posgraduation"
+        | "undergraduation";
       lookingFor?: "life_partner" | "casual" | "friendship" | "not_sure";
       height?: string; // e.g., "5'10", "178 cm"
       religion?:
@@ -133,9 +136,6 @@ export interface UserProfile {
     };
   };
 
-    ageRangePreference?: AgeRangePreference;
+  ageRangePreference?: AgeRangePreference;
   preferencesCompleted?: boolean;
-
-
 }
-
