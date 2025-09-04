@@ -2,169 +2,146 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if user is admin using custom claims OR admins collection
+    // --- 🔧 HELPERS ---
     function isAdmin() {
       return request.auth != null && (
         request.auth.token.admin == true ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
-    
-    // Helper function to check if a user document shows verified status
+
     function isUserVerified(userData) {
       return userData.verification != null && 
              userData.verification.verificationStatus == 'verified';
     }
-    
-    // Helper function to check if current user is verified
+
     function isCurrentUserVerified() {
       return request.auth != null && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              isUserVerified(get(/databases/$(database)/documents/users/$(request.auth.uid)).data);
     }
-    
-    // Helper function to check if user owns the document
+
     function isOwner(userId) {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // 🔒 FIXED: Admin collection - only existing admins can manage
+    // --- ADMINS COLLECTION ---
     match /admins/{adminId} {
-      // Users can read to check admin status, but CANNOT write
       allow read: if request.auth != null;
-      // Only existing admins can add/remove admins
       allow write, create, delete: if isAdmin();
     }
 
-    // Users collection
+    // --- USERS COLLECTION ---
     match /users/{userId} {
-      // Users can read/write their own profile
-      allow read, write: if isOwner(userId);
       
-      // Admins can read/write all users for dashboard
-      allow read, write: if isAdmin();
-      
-      // 🔒 FIXED: Only verified users can read other verified users' basic info
-      allow read: if isCurrentUserVerified() && 
-                     resource != null && 
-                     isUserVerified(resource.data);
+      // --- READ ACCESS ---
+      allow read: if isOwner(userId); // Always read own profile
+      allow read: if isCurrentUserVerified() && resource != null && isUserVerified(resource.data); // Verified ↔ Verified
+      allow read: if isAdmin(); // Admins can read all
 
-      // Notifications subcollection
+      // --- CREATE ---
+      allow create: if isOwner(userId);
+
+      // --- UPDATE ---
+      allow update: if isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'dateCards',
+          'verification',
+          'notifications',
+          'messages',
+          'updatedAt',
+          'interests',
+          'hobbies',
+          'datingPreference',
+          'workLifeStatus',
+          'dietaryPreference',
+          'bio',
+          'photos'
+        ]);
+
+      // Admins can always write
+      allow write: if isAdmin();
+
+      // --- SUBCOLLECTION: NOTIFICATIONS ---
       match /notifications/{notificationId} {
         allow read, write: if isOwner(userId);
-        allow write: if isAdmin(); // Admins can send notifications
+        allow write: if isAdmin();
       }
     }
 
-    // Matches collection
+    // --- MATCHES COLLECTION ---
     match /matches/{matchId} {
-      // Allow users to read matches they're involved in
-      allow read: if request.auth != null && 
-                     resource != null &&
-                     (resource.data.users[0] == request.auth.uid || 
-                      resource.data.users[1] == request.auth.uid);
-      
-      // Admins have full access to matches
-      allow read, write, create, delete: if isAdmin();
-      
-      // Allow users to update their acceptance status
-      allow update: if request.auth != null && 
-                       resource != null &&
-                       (resource.data.users[0] == request.auth.uid || 
-                        resource.data.users[1] == request.auth.uid) &&
-                       request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['user1Accepted', 'user2Accepted', 'status']);
+      allow read: if request.auth != null && resource != null &&
+        (resource.data.users[0] == request.auth.uid || resource.data.users[1] == request.auth.uid);
+
+      allow update: if request.auth != null && resource != null &&
+        (resource.data.users[0] == request.auth.uid || resource.data.users[1] == request.auth.uid) &&
+        request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['user1Accepted', 'user2Accepted', 'status']);
+
+      allow create: if request.auth != null &&
+        (request.resource.data.users[0] == request.auth.uid || request.resource.data.users[1] == request.auth.uid);
+
+      allow delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
-    // Date cards collection
+    // --- DATE CARDS COLLECTION ---
     match /dates/{dateId} {
-      // Users can read/write date cards they're involved in
-      allow read, write: if request.auth != null && 
-                           resource != null &&
-                           (resource.data.users[0] == request.auth.uid || 
-                            resource.data.users[1] == request.auth.uid);
-      
-      // Admins have full access
+      allow read, write: if request.auth != null && resource != null &&
+        (resource.data.users[0] == request.auth.uid || resource.data.users[1] == request.auth.uid);
       allow read, write, create, delete: if isAdmin();
     }
 
-    // Messages collection
+    // --- MESSAGES COLLECTION ---
     match /messages/{messageId} {
-      // Users can read messages they sent or received
-      allow read: if request.auth != null && 
-                     resource != null &&
-                     (resource.data.fromUid == request.auth.uid || 
-                      resource.data.toUid == request.auth.uid);
-      
-      // Users can create messages they're sending
-      allow create: if request.auth != null && 
-                       request.resource.data.fromUid == request.auth.uid;
-      
-      // Users can mark messages as read
-      allow update: if request.auth != null && 
-                       resource != null &&
-                       resource.data.toUid == request.auth.uid &&
-                       request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['read']);
-      
-      // Admins can read all messages
+      allow read: if request.auth != null && resource != null &&
+        (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+
+      allow create: if request.auth != null && request.resource.data.fromUid == request.auth.uid;
+
+      allow update: if request.auth != null && resource != null &&
+        resource.data.toUid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
       allow read, write, create, delete: if isAdmin();
     }
 
-    // Reports collection
+    // --- REPORTS COLLECTION ---
     match /reports/{reportId} {
-      // Users can create reports
-      allow create: if request.auth != null && 
-                       request.resource.data.reporterId == request.auth.uid;
-      
-      // Users can read reports they created
-      allow read: if request.auth != null && 
-                     resource != null &&
-                     resource.data.reporterId == request.auth.uid;
-      
-      // Admins have full access to reports
+      allow create: if request.auth != null && request.resource.data.reporterId == request.auth.uid;
+      allow read: if request.auth != null && resource != null && resource.data.reporterId == request.auth.uid;
       allow read, write, create, delete: if isAdmin();
     }
 
-    // Analytics collection
+    // --- ANALYTICS COLLECTION ---
     match /analytics/{docId} {
-      // Only admins can access analytics
       allow read, write, create, delete: if isAdmin();
     }
 
-    // App settings
+    // --- SETTINGS COLLECTION ---
     match /settings/{settingId} {
-      // All authenticated users can read settings
       allow read: if request.auth != null;
-      
-      // Only admins can modify settings
       allow write, create, delete: if isAdmin();
     }
 
-    // Verifications collection
+    // --- VERIFICATIONS COLLECTION ---
     match /verifications/{userId} {
-      // Users can read/write their own verification data
       allow read, write: if isOwner(userId);
-      
-      // Admins have full access
       allow read, write, create, delete: if isAdmin();
     }
 
-    // Queue management collection
+    // --- QUEUE COLLECTION ---
     match /queue/{userId} {
-      // Users can read their own queue status
       allow read: if isOwner(userId);
-      
-      // Users can update their queue preferences
       allow update: if isOwner(userId) &&
-                       request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['active', 'preferences']);
-      
-      // Admins have full access to queue management
+        request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['active', 'preferences']);
       allow read, write, create, delete: if isAdmin();
     }
 
-    // ✅ Catch-all rule for admin access to ANY document
+    // --- CATCH-ALL ADMIN ACCESS ---
     match /{document=**} {
       allow read, write: if isAdmin();
     }
