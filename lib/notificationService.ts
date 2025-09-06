@@ -4,7 +4,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 export interface NotificationPayload {
   title: string;
   body: string;
-  type: string; // e.g., "profile", "verification", "matchmaking"
+  type?: string; // e.g., "profile", "verification", "matchmaking"
   anchor?: string; // optional anchor for scroll
 }
 
