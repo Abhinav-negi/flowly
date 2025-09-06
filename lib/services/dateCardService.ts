@@ -55,35 +55,43 @@ export const respondToDateCard = async (
       throw new Error("User not authorized for this date card");
     }
 
-    const updatedResponses = {
-      ...dateCardData.responses,
-      [userId]: {
-        status: response as "accepted" | "declined",
-        respondedAt: Date.now(),
-        ...(response === "decline" && reason && { declineReason: reason })
-      }
-    };
+const updatedResponses = {
+  ...dateCardData.responses,
+  [userId]: {
+    status: response === "accept" ? "accepted" as const : "declined" as const,
+    respondedAt: Date.now(),
+    ...(response === "decline" && reason && { declineReason: reason })
+  }
+};
     console.log("📝 Updated responses:", updatedResponses);
 
     let newStatus = dateCardData.status;
     let confirmedAt = dateCardData.confirmedAt;
     let cancelledAt = dateCardData.cancelledAt;
 
-    const allResponses = Object.values(updatedResponses);
-    if (allResponses.length === 2) {
-      const allAccepted = allResponses.every(r => r.status === "accepted");
-      const anyDeclined = allResponses.some(r => r.status === "declined");
-      
-      if (allAccepted) {
-        newStatus = "confirmed";
-        confirmedAt = Date.now();
-        console.log("✅ Date confirmed!");
-      } else if (anyDeclined) {
-        newStatus = "cancelled";
-        cancelledAt = Date.now();
-        console.log("❌ Date cancelled!");
-      }
-    }
+const allResponses = Object.values(updatedResponses);
+console.log("🔍 All responses:", allResponses);
+console.log("🔍 Response count:", allResponses.length);
+
+if (allResponses.length === 2) {
+  const allAccepted = allResponses.every(r => r.status === "accepted");
+  const anyDeclined = allResponses.some(r => r.status === "declined");
+  
+  console.log("🔍 All accepted:", allAccepted);
+  console.log("🔍 Any declined:", anyDeclined);
+  
+  if (allAccepted) {
+    newStatus = "confirmed";
+    confirmedAt = Date.now();
+    console.log("✅ Date confirmed!");
+  } else if (anyDeclined) {
+    newStatus = "cancelled";
+    cancelledAt = Date.now();
+    console.log("❌ Date cancelled!");
+  }
+} else {
+  console.log("🔍 Not enough responses yet");
+}
 
     // Prepare update data
 const updateData: {

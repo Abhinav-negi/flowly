@@ -52,11 +52,13 @@ service cloud.firestore {
                   resource != null &&
                   isUserVerified(resource.data);
 
-      // Subcollection: notifications
-      match /notifications/{notificationId} {
-        allow read, write: if isOwner(userId);
-        allow write: if isAdmin();
-      }
+// Subcollection: notifications
+match /notifications/{notificationId} {
+  allow read, write: if isOwner(userId);
+  allow write: if isAdmin();
+  // Allow any authenticated user to create notifications for others
+  allow create: if request.auth != null;
+}
     }
 
     // 🔒 NEW: Matches collection

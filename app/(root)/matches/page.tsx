@@ -20,6 +20,7 @@ const [dateCards, setDateCards] = useState<DateCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showProfileSummary, setShowProfileSummary] = useState(false);
   const [showVerificationPopup, setShowVerificationPopup] = useState(false);
+  const [acceptingCard, setAcceptingCard] = useState<string | null>(null);
 
   // Decline reason state
   const [declineReason, setDeclineReason] = useState("");
@@ -124,8 +125,17 @@ useEffect(() => {
 
 const handleAccept = async (card: DateCard) => {
   if (!user) return;
-  await respondToDateCard(card.id, user.userId, "accept");
-  await refreshUserData();
+  try {
+    await respondToDateCard(card.id, user.userId, "accept");
+    // Add a small delay to ensure database consistency
+    setTimeout(async () => {
+      await refreshUserData();
+    }, 500);
+  } catch (error) {
+    console.error("Error accepting date:", error);
+    // Still refresh to show any partial updates
+    await refreshUserData();
+  }
 };
 
   // Helper function to calculate time until reveal
